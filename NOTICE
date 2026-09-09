@@ -1,0 +1,40 @@
+Frame
+Copyright 2026 Amber Pande
+
+This product includes software developed by Amber Pande.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+-------------------------------------------------------------------------------
+
+Frame depends on, but does not redistribute, the following third-party
+software. Each remains under its own licence.
+
+  FastAPI              MIT          https://github.com/fastapi/fastapi
+  Uvicorn              BSD-3-Clause https://github.com/encode/uvicorn
+  Pydantic             MIT          https://github.com/pydantic/pydantic
+  PyYAML               MIT          https://github.com/yaml/pyyaml
+  DuckDB               MIT          https://github.com/duckdb/duckdb
+  React                MIT          https://github.com/facebook/react
+  Vite                 MIT          https://github.com/vitejs/vite
+  TypeScript           Apache-2.0   https://github.com/microsoft/TypeScript
+
+Optional extras, installed only when requested:
+
+  snowflake-connector-python   Apache-2.0   https://github.com/snowflakedb/snowflake-connector-python
+  redis-py                     MIT          https://github.com/redis/redis-py
+  pytest                       MIT          https://github.com/pytest-dev/pytest
+
+Fonts referenced by the frontend (Archivo, IBM Plex Sans, IBM Plex Mono) are
+served from Google Fonts under the SIL Open Font License 1.1 and are not
+redistributed here.

@@ -1,5 +1,11 @@
 # Frame
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-0B6E63.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB.svg?logo=python&logoColor=white)](backend/pyproject.toml)
+[![React](https://img.shields.io/badge/react-18-61DAFB.svg?logo=react&logoColor=black)](frontend/package.json)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?logo=fastapi&logoColor=white)](backend/frame/main.py)
+[![Warehouse](https://img.shields.io/badge/warehouse-Snowflake%20%7C%20DuckDB-29B5E8.svg?logo=snowflake&logoColor=white)](docs/snowflake-live.md)
+
 **Dashboards as data.** One React runtime renders any dashboard from a
 versioned JSON spec, over a governed semantic layer on Snowflake.
 
@@ -11,6 +17,13 @@ This repo is **Phase 0**: the inversion, proven end to end. Four dashboards,
 thirty-six blocks, eight visualizations, one runtime. The plan the phases come
 from is in
 [the architecture blueprint](https://claude.ai/code/artifact/6870aeea-5998-4203-af80-9b540ba5f9c6).
+
+---
+
+## Licence
+
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Copyright 2026 Amber Pande.
 
 ---
 

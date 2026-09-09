@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "description": "One React runtime that renders any dashboard spec.",
+  "license": "Apache-2.0",
+  "author": "Amber Pande",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

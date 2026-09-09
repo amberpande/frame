@@ -3,6 +3,8 @@ name = "frame"
 version = "0.1.0"
 description = "Dashboards as data: one runtime, N specs, over a governed semantic layer."
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Amber Pande" }]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
