@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException
 
 from frame.registry import registry
 from frame.semantic import get_model
+from frame.semantic.expr import ExpressionError
+from frame.semantic.overlay import overlay
 from frame.spec.schema import DashboardSpec
 
 router = APIRouter(prefix="/api/v1/specs", tags=["specs"])
@@ -36,6 +38,13 @@ def upsert(spec_id: str, spec: DashboardSpec) -> dict:
         model = get_model(spec.model)
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+
+    # A spec's own calculations are validated first, so later block checks can
+    # see them as metrics.
+    try:
+        model = overlay(model, spec.metrics)
+    except ExpressionError as exc:
+        raise HTTPException(status_code=422, detail=exc.to_dict()) from None
 
     # Validate every block against the semantic model at publish time, so a
     # broken spec is rejected here rather than discovered by a viewer.

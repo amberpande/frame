@@ -1,5 +1,6 @@
 import type {
   DashboardSpec,
+  ExpressionCheck,
   FilterClause,
   QueryEnvelope,
   SemanticModel,
@@ -52,6 +53,13 @@ export const api = {
     request<string[]>(
       `/models/${model}/dimensions/${encodeURIComponent(dimension)}/values`
     ),
+
+  /** Check a calculated-metric formula. Reads no data. */
+  checkExpression: (model: string, expr: string) =>
+    request<ExpressionCheck>("/expressions/validate", {
+      method: "POST",
+      body: JSON.stringify({ model, expr }),
+    }),
 
   /** Publishing a dashboard is a write to a row. The API re-validates every
    *  block against the semantic model before storing it. */

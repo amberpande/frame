@@ -14,6 +14,9 @@ from frame.identity import Identity
 from frame.params import bind_query, latest_date, param_filters, resolve_params
 from frame.registry import registry
 from frame.semantic import get_model
+from frame.semantic.expr import ExpressionError
+from frame.semantic.expr import validate_expression as validate_expr
+from frame.semantic.overlay import check_single_source, overlay, source_map
 from frame.serve import get_engine, serve
 from frame.serve.tiers import ServedResult
 from frame.spec.schema import FilterClause, Freshness, QuerySpec
@@ -84,7 +87,12 @@ def block_data(
             f"{block.source.block if block.source else 'nothing'}",
         )
 
-    model = get_model(spec.model)
+    # A dashboard's own calculations behave exactly like model metrics from
+    # here on: same compiler, same guards, same grain rules.
+    try:
+        model = overlay(get_model(spec.model), spec.metrics)
+    except ExpressionError as exc:
+        raise HTTPException(status_code=422, detail=exc.to_dict()) from None
     engine = get_engine()
 
     values = resolve_params(spec, model, engine, body.params)
@@ -192,3 +200,40 @@ def _compile(model, query, as_of, compare_to, identity: Identity) -> QueryPlan:
             large_table_rows=config.LARGE_TABLE_ROWS,
         )
     )
+
+
+class ExpressionRequest(BaseModel):
+    model: str
+    expr: str
+
+
+@router.post("/expressions/validate")
+def validate_expression_endpoint(body: ExpressionRequest) -> dict:
+    """Check a calculated-metric formula without running anything.
+
+    This is what the formula editor calls on every keystroke, and what an agent
+    calls before writing a calculation into a spec. It reads no data.
+    """
+    try:
+        model = get_model(body.model)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+
+    known = {m.name for m in model.metrics}
+    try:
+        parsed = validate_expr(body.expr, known)
+        check_single_source(source_map(model), parsed)
+    except ExpressionError as exc:
+        return {"ok": False, "error": exc.to_dict()}
+
+    return {
+        "ok": True,
+        "references": list(parsed.references),
+        "functions": list(parsed.functions),
+        # The calculation can only be sliced where all of its inputs can be.
+        "grain": sorted(
+            set.intersection(*(model.effective_grain(r) for r in parsed.references))
+            if parsed.references
+            else set()
+        ),
+    }

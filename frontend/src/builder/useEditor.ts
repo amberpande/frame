@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../runtime/client";
-import type { Block, DashboardSpec, Placement } from "../spec/types";
+import type { Block, CalculatedMetric, DashboardSpec, Placement } from "../spec/types";
 import { manifests } from "../viz/manifests";
 import { pruneOptions, type ResolvedOptions } from "../viz/options";
 
@@ -22,6 +22,8 @@ export interface Editor {
   place: (blockId: string, at: Placement) => void;
   addBlock: (viz: string) => void;
   removeBlock: (blockId: string) => void;
+
+  setCalculations: (metrics: CalculatedMetric[]) => void;
 }
 
 const EMPTY: Editor["draft"] = null;
@@ -153,6 +155,11 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     [mutate]
   );
 
+  const setCalculations = useCallback(
+    (metrics: CalculatedMetric[]) => mutate((d) => { d.metrics = metrics; }),
+    [mutate]
+  );
+
   const save = useCallback(async () => {
     if (!draft) return;
     setSaving(true);
@@ -189,6 +196,7 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     place,
     addBlock,
     removeBlock,
+    setCalculations,
   };
 }
 

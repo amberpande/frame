@@ -4,6 +4,7 @@ import type { Block, DashboardSpec, SemanticModel } from "../spec/types";
 import { catalogue } from "../viz/registry";
 import { manifests, type OptionSpec } from "../viz/manifests";
 import { resolveOptions, type ResolvedOptions } from "../viz/options";
+import Calculations from "./Calculations";
 import type { Editor } from "./useEditor";
 
 interface Props {
@@ -27,6 +28,12 @@ export default function Inspector({ spec, block, editor }: Props) {
     return (
       <aside className="vd-inspector">
         <p className="vd-inspector__empty">Select a block to edit it.</p>
+        <Calculations
+          modelName={spec.model}
+          model={model}
+          calculations={spec.metrics ?? []}
+          editor={editor}
+        />
         <AddBlock editor={editor} />
       </aside>
     );
@@ -34,8 +41,19 @@ export default function Inspector({ spec, block, editor }: Props) {
 
   const manifest = manifests[block.viz];
   const options = resolveOptions(block.viz, block.options);
-  const grainFor = (metric: string) =>
-    model?.metrics.find((m) => m.name === metric)?.grain ?? [];
+  const grainFor = (metric: string) => {
+    const known = model?.metrics.find((m) => m.name === metric);
+    if (known) return known.grain;
+    // A dashboard calculation inherits the intersection of its inputs' grains.
+    const calc = (spec.metrics ?? []).find((c) => c.name === metric);
+    if (!calc) return [];
+    const refs = [...calc.expr.matchAll(/\{([a-zA-Z0-9_.]+)/g)].map((m) => m[1]);
+    const grains = refs
+      .map((r) => model?.metrics.find((m) => m.name === r)?.grain)
+      .filter((g): g is string[] => Boolean(g));
+    if (!grains.length) return [];
+    return grains.reduce((acc, g) => acc.filter((d) => g.includes(d)));
+  };
 
   // A dimension is only offerable if every selected metric is grained on it.
   const legalDims = (model?.dimensions ?? []).filter((d) =>
@@ -120,7 +138,10 @@ export default function Inspector({ spec, block, editor }: Props) {
           <Field label="Metrics">
             <TokenPicker
               selected={block.query.metrics}
-              available={(model?.metrics ?? []).map((m) => ({ value: m.name, label: m.label }))}
+              available={[
+                ...(model?.metrics ?? []).map((m) => ({ value: m.name, label: m.label })),
+                ...(spec.metrics ?? []).map((c) => ({ value: c.name, label: `${c.label} (calc)` })),
+              ]}
               onChange={(metrics) =>
                 editor.patchBlock(block.id, { query: { ...block.query!, metrics } })
               }
@@ -239,6 +260,13 @@ export default function Inspector({ spec, block, editor }: Props) {
           ))}
         </Section>
       )}
+
+      <Calculations
+        modelName={spec.model}
+        model={model}
+        calculations={spec.metrics ?? []}
+        editor={editor}
+      />
 
       <AddBlock editor={editor} />
     </aside>

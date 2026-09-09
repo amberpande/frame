@@ -109,6 +109,30 @@ class Param(Base):
     multi: bool = False
 
 
+class CalculatedMetric(Base):
+    """A metric defined by a dashboard, not by the semantic model.
+
+    Scoped to this spec: it cannot be referenced from anywhere else, so it
+    cannot pollute the shared namespace. That is what makes it safe to let a
+    dashboard author create one without review.
+
+    It may only be an expression over metrics that already exist — no columns,
+    no tables, no joins, no aggregates. A calculation that needs any of those
+    is a *measure*, and a measure belongs in the model where it gets a grain,
+    an owner and a test. See frame.semantic.expr for what is permitted.
+
+    The `calc.` prefix is required so that reading any dashboard tells you at a
+    glance which of its metrics are governed and which are not.
+    """
+
+    name: str = Field(pattern=r"^calc\.[a-z][a-z0-9_]*$")
+    label: str
+    expr: str = Field(min_length=1, max_length=1000)
+    format: dict[str, Any] = Field(default_factory=dict)
+    direction: Literal["higher_is_better", "lower_is_better", "neutral"] = "neutral"
+    description: str | None = None
+
+
 class DashboardSpec(Base):
     # Points editors and coding agents at schemas/spec.schema.json so a spec
     # gets completion and validation while it is being written, rather than a
@@ -126,6 +150,9 @@ class DashboardSpec(Base):
     owner: str | None = None
     tags: list[str] = Field(default_factory=list)
     params: list[Param] = Field(default_factory=list)
+    # Dashboard-local calculations. Promote one into the semantic model when it
+    # proves useful to more than this dashboard.
+    metrics: list[CalculatedMetric] = Field(default_factory=list)
     blocks: list[Block] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -154,6 +181,12 @@ class DashboardSpec(Base):
                 ref = block.query.compare[1:]
                 if ref not in param_names:
                     raise ValueError(f"block {block.id!r} compares to unknown param ${ref}")
+
+        calc_names: set[str] = set()
+        for calc in self.metrics:
+            if calc.name in calc_names:
+                raise ValueError(f"duplicate calculated metric: {calc.name}")
+            calc_names.add(calc.name)
 
         if self.freshness is Freshness.live and not self.justification:
             raise ValueError(

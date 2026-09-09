@@ -380,3 +380,77 @@ specs are editable data and may be older than the mark.
 To add an option to a mark, add an `OptionSpec` to its manifest and read it in
 the component with `bool()`, `num()` or `str()` from `viz/options.ts`. The
 inspector needs no change.
+
+
+---
+
+## Defining a metric from the dashboard
+
+There are two kinds of new metric, and they are not interchangeable.
+
+| You need | It is a | Where it lives | Who can add it |
+|---|---|---|---|
+| A combination of metrics that already exist — a ratio, a share, a rate | **calculation** | The spec | Anyone editing the dashboard |
+| A new aggregate over a raw column — a `SUM`, a `COUNT DISTINCT`, a filtered count | **measure** | The semantic model | Requires an owner and a test |
+
+The split is not bureaucracy. A calculation references only governed metric
+names, so it cannot introduce a column, a table or a join, and its grain is
+inherited from its inputs. A measure introduces all of those, which is exactly
+why it needs a grain, an owner and a test.
+
+### Adding a calculation
+
+In the builder: **Edit → Calculated metrics → New calculation**. The formula is
+validated on the server as you type, by the same code that runs at publish time,
+so the editor cannot accept something the platform will later reject.
+
+In a spec, it is a top-level `metrics` array:
+
+```json
+"metrics": [
+  {
+    "name": "calc.exposure_per_item",
+    "label": "Exposure per item",
+    "expr": "{exception.value_usd} / NULLIF({exception.count}, 0)",
+    "format": { "style": "currency", "currency": "USD" },
+    "direction": "lower_is_better"
+  }
+]
+```
+
+Then use `calc.exposure_per_item` in any block's `query.metrics`, exactly like a
+model metric.
+
+**Rules**
+
+- The name must start with `calc.` — so reading any dashboard tells you at a
+  glance which of its metrics are governed and which are not.
+- `{metric.name}` references only. A bare `amount_usd` is refused: it would be a
+  column reference escaping the semantic layer.
+- Arithmetic `+ - * / ( )` and these scalar functions: `NULLIF`, `COALESCE`,
+  `ABS`, `ROUND`, `FLOOR`, `CEIL`, `GREATEST`, `LEAST`, `POWER`, `SQRT`, `LN`,
+  `LOG`, `EXP`, `SIGN`, `MOD`.
+- No aggregates. The operands are already aggregated, so `SUM(...)` here would
+  be a second, meaningless aggregation.
+- All inputs must come from one source table. Mixing sources is refused with
+  `multi_source_calculation` while you type, because the compiler cannot join
+  across sources.
+- A calculation may build on an earlier calculation in the same spec, never a
+  later one.
+- It may not shadow a metric in the model.
+
+Check one without opening the builder:
+
+```bash
+curl -s -X POST localhost:8000/api/v1/expressions/validate   -H "Content-Type: application/json"   -d '{"model":"finance_ops","expr":"{exception.p1_count} / NULLIF({exception.count},0)"}'
+```
+
+Returns `{"ok": true, "references": [...], "grain": [...]}` — the grain being
+the dimensions the calculation can legally be grouped by.
+
+### Promoting a calculation
+
+A calculation is scoped to one dashboard, so it cannot pollute the shared
+namespace. When the same one appears in several dashboards, that is the signal
+to promote it into the model — see
+[`semantic-model.md`](./semantic-model.md#promoting-a-dashboard-calculation).

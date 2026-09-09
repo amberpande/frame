@@ -69,3 +69,7 @@ docs/                    authoring-specs, semantic-model, snowflake-live
 5. Sorting a signed metric without `"abs": true`, which buries large
    improvements.
 6. Filtering on a metric. `filters[].field` must be a dimension.
+7. Writing a bare column name in a calculated metric's formula. Only
+   `{metric.name}` references are allowed — `amount_usd` is refused, because it
+   would be a column reference escaping the semantic layer. A calculation that
+   genuinely needs a column is a **measure**, and belongs in the model.

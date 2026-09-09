@@ -71,6 +71,24 @@ export interface Param {
   multi?: boolean;
 }
 
+/** A calculation defined by a dashboard, not by the semantic model. */
+export interface CalculatedMetric {
+  name: string;            // must start with "calc."
+  label: string;
+  expr: string;            // {metric.name} references, arithmetic, whitelisted functions
+  format?: ValueFormat;
+  direction?: "higher_is_better" | "lower_is_better" | "neutral";
+  description?: string;
+}
+
+export interface ExpressionCheck {
+  ok: boolean;
+  references?: string[];
+  functions?: string[];
+  grain?: string[];
+  error?: { reason: string; detail: string; [k: string]: unknown };
+}
+
 export interface DashboardSpec {
   id: string;
   specVersion: number;
@@ -81,6 +99,7 @@ export interface DashboardSpec {
   owner?: string;
   tags?: string[];
   params: Param[];
+  metrics?: CalculatedMetric[];
   blocks: Block[];
 }
 

@@ -17,13 +17,15 @@
       "name": "as_of",
       "type": "date",
       "label": "As of",
-      "default": "@latest_close"
+      "default": "@latest_close",
+      "multi": false
     },
     {
       "name": "compare_to",
       "type": "date",
       "label": "Compared to",
-      "default": "@as_of - 28d"
+      "default": "@as_of - 28d",
+      "multi": false
     }
   ],
   "blocks": [
@@ -41,8 +43,12 @@
         "metrics": [
           "sla.breach_rate"
         ],
+        "by": [],
+        "filters": [],
         "compare": "$compare_to"
-      }
+      },
+      "encode": {},
+      "options": {}
     },
     {
       "id": "kpi-breached",
@@ -58,8 +64,12 @@
         "metrics": [
           "sla.breached"
         ],
+        "by": [],
+        "filters": [],
         "compare": "$compare_to"
-      }
+      },
+      "encode": {},
+      "options": {}
     },
     {
       "id": "kpi-scope",
@@ -75,8 +85,12 @@
         "metrics": [
           "sla.total"
         ],
+        "by": [],
+        "filters": [],
         "compare": "$compare_to"
-      }
+      },
+      "encode": {},
+      "options": {}
     },
     {
       "id": "rate-trend",
@@ -96,11 +110,15 @@
         "by": [
           "sla.as_of_date"
         ],
+        "filters": [],
         "windowDays": 76
       },
       "encode": {
         "x": "sla.as_of_date",
         "y": "sla.breach_rate"
+      },
+      "options": {
+        "showArea": true
       }
     },
     {
@@ -120,6 +138,7 @@
         "by": [
           "sla.team"
         ],
+        "filters": [],
         "compare": "$compare_to"
       },
       "encode": {
@@ -128,8 +147,10 @@
       },
       "sort": {
         "by": "sla.breach_rate",
-        "dir": "desc"
-      }
+        "dir": "desc",
+        "abs": false
+      },
+      "options": {}
     },
     {
       "id": "sla-detail",
@@ -149,12 +170,16 @@
         ],
         "by": [
           "sla.team"
-        ]
+        ],
+        "filters": []
       },
+      "encode": {},
       "sort": {
         "by": "sla.breach_rate",
-        "dir": "desc"
-      }
+        "dir": "desc",
+        "abs": false
+      },
+      "options": {}
     },
     {
       "id": "aging-detail",
@@ -177,13 +202,16 @@
         ],
         "by": [
           "exception.team"
-        ]
+        ],
+        "filters": []
       },
+      "encode": {},
       "sort": {
         "by": "severity.aged_z",
         "dir": "desc",
         "abs": true
-      }
+      },
+      "options": {}
     }
   ]
 }

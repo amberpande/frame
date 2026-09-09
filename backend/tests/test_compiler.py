@@ -291,3 +291,108 @@ def test_approx_distinct_is_opt_in(model):
     )
     assert "APPROX_COUNT_DISTINCT" in plan.sql
     assert "COUNT(DISTINCT" not in plan.sql
+
+
+# --------------------------------------------------------- calculated metrics
+
+def test_dashboard_calculation_compiles_like_a_model_metric(model):
+    """A spec's own calculation goes through the same compiler and guards."""
+    from frame.semantic.overlay import overlay
+    from frame.spec.schema import CalculatedMetric
+
+    calc = CalculatedMetric(
+        name="calc.exposure_per_item",
+        label="Exposure per item",
+        expr="{exception.value_usd} / NULLIF({exception.count}, 0)",
+    )
+    extended = overlay(model, [calc])
+
+    plan = compile_query(
+        CompileRequest(
+            model=extended,
+            query=QuerySpec(
+                metrics=["calc.exposure_per_item"], by=["exception.reason_code"]
+            ),
+            as_of=AS_OF,
+            identity=ANALYST,
+            dialect=get_dialect("duckdb"),
+        )
+    )
+    assert "NULLIF" in plan.sql
+    assert '"calc.exposure_per_item"' in plan.sql
+    # It inherits the grain of its inputs, so the guard still applies.
+    assert extended.effective_grain("calc.exposure_per_item") == model.effective_grain(
+        "exception.count"
+    )
+
+
+def test_calculation_may_not_shadow_a_governed_metric(model):
+    from frame.semantic.expr import ExpressionError
+    from frame.semantic.overlay import overlay
+    from frame.spec.schema import CalculatedMetric
+
+    with pytest.raises(ExpressionError) as err:
+        overlay(
+            model,
+            [
+                CalculatedMetric(
+                    name="calc.x", label="x", expr="{exception.count} * 2"
+                ).model_copy(update={"name": "exception.count"})
+            ],
+        )
+    assert err.value.reason == "shadows_model_metric"
+
+
+def test_calculation_changes_the_model_fingerprint(model):
+    """A dashboard with its own calculations must not share cache entries with
+    one that computes something different under the same name."""
+    from frame.semantic.overlay import overlay
+    from frame.spec.schema import CalculatedMetric
+
+    a = overlay(model, [CalculatedMetric(name="calc.v", label="v", expr="{exception.count} * 2")])
+    b = overlay(model, [CalculatedMetric(name="calc.v", label="v", expr="{exception.count} * 3")])
+    assert a.fingerprint() != b.fingerprint()
+    assert overlay(model, []).fingerprint() == model.fingerprint()
+
+
+def test_calculation_may_build_on_an_earlier_calculation(model):
+    """A calc referencing an earlier calc must resolve, not crash."""
+    from frame.semantic.overlay import overlay
+    from frame.spec.schema import CalculatedMetric
+
+    extended = overlay(
+        model,
+        [
+            CalculatedMetric(
+                name="calc.per_item",
+                label="Per item",
+                expr="{exception.value_usd} / NULLIF({exception.count}, 0)",
+            ),
+            CalculatedMetric(
+                name="calc.per_item_k", label="Per item (k)", expr="{calc.per_item} / 1000"
+            ),
+        ],
+    )
+    assert extended.has_metric("calc.per_item_k")
+    assert extended.effective_grain("calc.per_item_k") == model.effective_grain("exception.count")
+
+
+def test_cross_source_calculation_is_refused(model):
+    """It would validate and then fail on first render, so refuse it early."""
+    from frame.semantic.expr import ExpressionError
+    from frame.semantic.overlay import overlay
+    from frame.spec.schema import CalculatedMetric
+
+    with pytest.raises(ExpressionError) as err:
+        overlay(
+            model,
+            [
+                CalculatedMetric(
+                    name="calc.mixed",
+                    label="Mixed",
+                    expr="{exception.count} / NULLIF({sla.total}, 0)",
+                )
+            ],
+        )
+    assert err.value.reason == "multi_source_calculation"
+    assert set(err.value.to_dict()["sources"]) == {"fct_exception", "agg_team_sla"}

@@ -217,6 +217,46 @@ semantic layer is becoming an asset or a dumping ground.
 
 ---
 
+## Promoting a dashboard calculation
+
+Dashboards can define their own calculations (`calc.*`, see
+[`authoring-specs.md`](./authoring-specs.md#defining-a-metric-from-the-dashboard)).
+They are scoped to one spec and never enter the shared namespace, which is what
+makes them safe to create without review.
+
+They are also a demand signal. If five dashboards independently define the same
+ratio, that is the argument for promoting it — and unlike a feature request, it
+is a fact you can query:
+
+```bash
+grep -h '"expr"' backend/specs/*.json | sort | uniq -c | sort -rn | head
+```
+
+To promote one, move it into the model and give it what a governed metric needs:
+
+```yaml
+  - name: exception.value_per_item        # drop the calc. prefix
+    label: Average exposure
+    kind: derived
+    expr: "{exception.value_usd} / NULLIF({exception.count}, 0)"
+    format: { style: currency, currency: USD }
+    direction: lower_is_better
+    owner: fin-ops-platform               # required
+    tests: [non_negative]                 # required
+    synonyms: ["exposure per item", "average exposure"]
+```
+
+Then delete the `calc.` version from each spec and point the blocks at the new
+name. The dashboards keep working; the definition is now reviewed, testable and
+reusable.
+
+**Do not promote everything.** A calculation used by one dashboard should stay
+in that dashboard. Promotion is for definitions that more than one team relies
+on — otherwise the model becomes the dumping ground the `calc.` prefix exists to
+prevent.
+
+---
+
 ## Governance, which is the real risk
 
 The failure mode is not technical. It is a model with 1,200 metrics and four
