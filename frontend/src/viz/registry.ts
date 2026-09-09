@@ -3,9 +3,12 @@ import type { Block, DashboardSpec, QueryMeta } from "../spec/types";
 import type { Group, Table } from "../runtime/table";
 import type { Selection } from "../runtime/selection";
 import { manifests, type VizManifest } from "./manifests";
+import type { ResolvedOptions } from "./options";
 
 export interface VizProps {
   block: Block;
+  /** The block's options merged over the manifest defaults. Never undefined. */
+  options: ResolvedOptions;
   spec: DashboardSpec;
   table: Table | null;
   meta: QueryMeta | null;

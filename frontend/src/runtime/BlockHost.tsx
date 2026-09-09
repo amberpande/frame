@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Block, DashboardSpec } from "../spec/types";
 import { resolve } from "../viz/registry";
+import { resolveOptions } from "../viz/options";
 import { useSelection } from "./selection";
 import type { BlockState } from "./useDashboardData";
 
@@ -9,6 +10,11 @@ interface Props {
   block: Block;
   state: BlockState;
   sourceState: BlockState;
+  /** Edit-mode affordances. Absent in normal viewing. */
+  editing?: boolean;
+  isSelected?: boolean;
+  onSelectBlock?: () => void;
+  onDragHandle?: (mode: "move" | "resize", e: React.PointerEvent) => void;
 }
 
 /**
@@ -19,7 +25,16 @@ interface Props {
  * first-class state, not a crash: a runtime must survive meeting a spec
  * written against a newer catalogue.
  */
-export default function BlockHost({ spec, block, state, sourceState }: Props) {
+export default function BlockHost({
+  spec,
+  block,
+  state,
+  sourceState,
+  editing = false,
+  isSelected = false,
+  onSelectBlock,
+  onDragHandle,
+}: Props) {
   const entry = resolve(block.viz);
   const { select, from } = useSelection();
 
@@ -47,8 +62,41 @@ export default function BlockHost({ spec, block, state, sourceState }: Props) {
   const own = from(block.id);
   const meta = state.meta;
 
+  const editClass = editing
+    ? ` vd-block--editing${isSelected ? " is-selected" : ""}`
+    : "";
+
   return (
-    <section className="vd-block" style={style}>
+    <section
+      className={`vd-block${editClass}`}
+      style={style}
+      onPointerDownCapture={editing ? onSelectBlock : undefined}
+    >
+      {editing && (
+        <>
+          {/* Drag the whole block by its bar; resize from the corner. Both
+              snap to the 12-column grid the spec describes. */}
+          <button
+            type="button"
+            className="vd-block__movebar"
+            title="Drag to move"
+            aria-label={`Move ${block.title ?? block.id}`}
+            onPointerDown={(e) => onDragHandle?.("move", e)}
+          >
+            <span className="vd-block__grip" aria-hidden="true" />
+            <span className="vd-block__coords">
+              {block.at.w}&times;{block.at.h}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="vd-block__resize"
+            title="Drag to resize"
+            aria-label={`Resize ${block.title ?? block.id}`}
+            onPointerDown={(e) => onDragHandle?.("resize", e)}
+          />
+        </>
+      )}
       {(block.title || meta) && (
         <div className="vd-block__head">
           <div>
@@ -90,6 +138,7 @@ export default function BlockHost({ spec, block, state, sourceState }: Props) {
           <Suspense fallback={<div className="vd-skeleton" aria-label="Loading" />}>
             <Viz
               block={block}
+              options={resolveOptions(block.viz, block.options)}
               spec={spec}
               table={state.table}
               meta={state.meta}

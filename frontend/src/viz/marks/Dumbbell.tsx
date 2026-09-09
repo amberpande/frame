@@ -2,6 +2,7 @@ import DeltaChip from "../../primitives/DeltaChip";
 import SeverityChip from "../../primitives/SeverityChip";
 import { formatDate, formatValue } from "../../runtime/format";
 import { Table } from "../../runtime/table";
+import { bool, num, str } from "../options";
 import type { VizProps } from "../registry";
 
 /**
@@ -12,7 +13,7 @@ import type { VizProps } from "../registry";
  * connector length *is* the variance — so the connector is never scaled
  * independently of the dots.
  */
-export default function Dumbbell({ block, table, meta, selected, onSelect }: VizProps) {
+export default function Dumbbell({ block, table, meta, selected, onSelect, options }: VizProps) {
   if (!table) return null;
 
   const groups = table.groups();
@@ -28,6 +29,11 @@ export default function Dumbbell({ block, table, meta, selected, onSelect }: Viz
   ]);
   const max = Math.max(...values, 1);
   const pct = (v: number) => (v / max) * 100;
+
+  const showSeverity = bool(options, "showSeverity", true);
+  const showPercent = bool(options, "showPercent", true);
+  const labelWidth = num(options, "labelWidth", 130);
+  const weight = str(options, "connectorWeight", "regular");
 
   const asOf = formatDate(meta?.params?.as_of);
   const comparedTo = formatDate(meta?.params?.compare_to);
@@ -55,6 +61,7 @@ export default function Dumbbell({ block, table, meta, selected, onSelect }: Viz
             <li key={g.key}>
               <button
                 type="button"
+                style={{ gridTemplateColumns: `${labelWidth}px minmax(60px, 1fr) 58px 92px auto` }}
                 className={`vd-dumbbell__row${isSelected ? " is-selected" : ""}`}
                 onClick={() => onSelect(g)}
                 aria-pressed={isSelected}
@@ -65,7 +72,7 @@ export default function Dumbbell({ block, table, meta, selected, onSelect }: Viz
 
                 <span className="vd-track">
                   <span
-                    className="vd-track__connector"
+                    className={`vd-track__connector vd-track__connector--${weight}`}
                     style={{ left: `${lo}%`, width: `${Math.max(hi - lo, 0)}%` }}
                   />
                   <span className="vd-dot vd-dot--past" style={{ left: `${pct(past)}%` }} />
@@ -81,9 +88,10 @@ export default function Dumbbell({ block, table, meta, selected, onSelect }: Viz
                     previous={past}
                     format={xCol?.format}
                     direction={xCol?.direction}
+                    showPercent={showPercent}
                   />
                 </span>
-                {sevCol && (
+                {sevCol && showSeverity && (
                   <span className="vd-dumbbell__sev">
                     <SeverityChip
                       z={Table.num(g.current, sevCol.name)}

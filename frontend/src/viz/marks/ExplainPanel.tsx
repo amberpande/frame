@@ -3,6 +3,7 @@ import { api } from "../../runtime/client";
 import { formatDate, formatDelta, formatPercentDelta, formatValue } from "../../runtime/format";
 import { Table } from "../../runtime/table";
 import type { SemanticModel } from "../../spec/types";
+import { bool } from "../options";
 import type { VizProps } from "../registry";
 
 /**
@@ -17,7 +18,9 @@ import type { VizProps } from "../registry";
  * The panel never queries the warehouse itself. It reads the source block's
  * result and nothing else.
  */
-export default function ExplainPanel({ block, spec, incoming, sourceTable, sourceMeta }: VizProps) {
+export default function ExplainPanel({
+  block, spec, incoming, sourceTable, sourceMeta, options,
+}: VizProps) {
   const [model, setModel] = useState<SemanticModel | null>(null);
 
   useEffect(() => {
@@ -104,7 +107,7 @@ export default function ExplainPanel({ block, spec, incoming, sourceTable, sourc
         </li>
       </ul>
 
-      {definitionsFor.length > 0 && (
+      {definitionsFor.length > 0 && bool(options, "showDefinitions", true) && (
         <section className="vd-explain__section">
           <h5>Definitions</h5>
           {definitionsFor.map((d) => (
@@ -117,7 +120,7 @@ export default function ExplainPanel({ block, spec, incoming, sourceTable, sourc
         </section>
       )}
 
-      {grounding.includes("query.sql") && sourceMeta?.sql && (
+      {grounding.includes("query.sql") && bool(options, "showSql", true) && sourceMeta?.sql && (
         <details className="vd-explain__section">
           <summary>Compiled SQL</summary>
           <pre className="vd-explain__sql">{sourceMeta.sql}</pre>

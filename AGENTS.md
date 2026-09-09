@@ -36,6 +36,8 @@ a dashboard is a file, not a deploy.
 | Change how SQL is produced | `backend/frame/compile/compiler.py` |
 | Add a validation rule | `backend/frame/compile/guard.py` |
 | Add a visualization | `frontend/src/viz/manifests.ts` + `frontend/src/viz/marks/` + `registry.ts` |
+| Add a chart option | An `OptionSpec` in the mark's manifest, read via `viz/options.ts` |
+| Change the builder | `frontend/src/builder/` — must stay generic; no per-chart code |
 | Change caching or tiers | `backend/frame/serve/` |
 | Add an API route | `backend/frame/api/` |
 

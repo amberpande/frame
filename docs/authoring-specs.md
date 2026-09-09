@@ -3,6 +3,20 @@
 A dashboard is a JSON file in `backend/specs/`. Creating one requires no build,
 no deploy and no restart. Write the file, reload the page.
 
+There are two ways to write one.
+
+**In the browser.** Open the dashboard and press **Edit**. Drag blocks by the
+grip bar, resize from the corner, and use the inspector to change the title,
+the visualization, the query and every chart option. **Save** publishes it back
+to the same JSON row; **Copy JSON** puts the document on your clipboard. Nothing
+in the inspector is chart-specific — the controls are generated from the
+visualization's manifest, so a new mark appears there with no builder change.
+
+**By hand or by agent**, which is what the rest of this document describes.
+The two are interchangeable: the builder edits the same file, and a save writes
+a minimal document with defaults omitted, so hand-edits and builder edits do not
+fight each other.
+
 This document is the complete procedure. Follow it in order.
 
 ---
@@ -325,3 +339,44 @@ curl -s -X POST localhost:8000/api/v1/specs/my-dashboard/blocks/movers/data \
 - [ ] Any `source` names an existing block
 - [ ] `freshness` is not `live` without a `justification`
 - [ ] `POST /api/v1/validate` returns `ok: true` for every block's query
+
+
+---
+
+## Customising a chart
+
+Every visualization declares its own options in
+`frontend/src/viz/manifests.ts`. They are typed and defaulted, so:
+
+- the inspector renders a control for each one automatically,
+- an agent can set them without guessing,
+- a spec stores only what differs from the default.
+
+```jsonc
+{
+  "id": "movers",
+  "viz": "mark.dumbbell",
+  "options": {
+    "showSeverity": false,        // only the changes are stored
+    "connectorWeight": "heavy"
+  }
+}
+```
+
+An option that is not declared for that mark is ignored rather than trusted —
+specs are editable data and may be older than the mark.
+
+| Mark | Options |
+|---|---|
+| `mark.dumbbell` | `showSeverity`, `showPercent`, `labelWidth`, `connectorWeight` |
+| `mark.bar` | `showGhost`, `showValue`, `showDelta`, `labelWidth` |
+| `mark.line` | `showArea`, `showEndpoint`, `strokeWidth`, `yFromZero`, `tickCount` |
+| `mark.matrix` | `showValues`, `intensity`, `scale` |
+| `big.number` | `size`, `showDelta`, `showPercent`, `goodDirection` |
+| `briefing.band` | `threshold`, `showChips`, `maxChips` |
+| `table.grid` | `density`, `zebra`, `showRank` |
+| `panel.explain` | `showSql`, `showDefinitions` |
+
+To add an option to a mark, add an `OptionSpec` to its manifest and read it in
+the component with `bool()`, `num()` or `str()` from `viz/options.ts`. The
+inspector needs no change.

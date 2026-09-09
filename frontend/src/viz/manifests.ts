@@ -26,11 +26,34 @@ export interface Channel {
   note?: string;
 }
 
+/**
+ * A knob on a chart.
+ *
+ * Declared, typed and defaulted here so one generic inspector can render a
+ * control for it, the agent can set it without guessing, and adding a mark
+ * still costs zero builder code. An undeclared option is not customisable —
+ * that is the point.
+ */
+export interface OptionSpec {
+  type: "boolean" | "number" | "select" | "string";
+  label: string;
+  default: boolean | number | string;
+  /** For type: "select". */
+  choices?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  /** Shown under the control. Say what it is FOR, not what it does. */
+  help?: string;
+}
+
 export interface VizManifest {
   id: string;
   name: string;
   description: string;
   channels: Record<string, Channel>;
+  /** What a viewer or an agent may change about this mark. */
+  options: Record<string, OptionSpec>;
   goodFor: string[];
   notFor: string[];
   invariant?: string;
@@ -58,6 +81,18 @@ export const manifests: Record<string, VizManifest> = {
         note: "exactly two observations",
       },
     },
+    options: {
+      showSeverity: { type: "boolean", label: "Severity chip", default: true,
+        help: "How far outside normal each row sits." },
+      showPercent: { type: "boolean", label: "Percentage alongside change", default: true,
+        help: "Absolute change always leads; this adds the percentage after it." },
+      labelWidth: { type: "number", label: "Label column width", default: 130,
+        min: 80, max: 320, step: 10 },
+      connectorWeight: { type: "select", label: "Connector weight", default: "regular",
+        choices: [{ value: "light", label: "Light" }, { value: "regular", label: "Regular" },
+                  { value: "heavy", label: "Heavy" }],
+        help: "The connector length is the variance. Weight is styling only." },
+    },
     goodFor: ["two measured points in time", "before and after by category"],
     notFor: [
       "three or more periods — use a slope or a line",
@@ -79,6 +114,14 @@ export const manifests: Record<string, VizManifest> = {
       y: { accepts: "dimension", required: true, cardinality: [1, 30] },
       x: { accepts: "measure", required: true, count: 1 },
     },
+    options: {
+      showGhost: { type: "boolean", label: "Comparison outline", default: true,
+        help: "The previous period as a quiet outline behind each bar." },
+      showValue: { type: "boolean", label: "Value labels", default: true },
+      showDelta: { type: "boolean", label: "Change", default: true },
+      labelWidth: { type: "number", label: "Label column width", default: 130,
+        min: 80, max: 320, step: 10 },
+    },
     goodFor: ["ranked magnitude by category", "composition at one point in time"],
     notFor: [
       "emphasising change between two dates — use a dumbbell",
@@ -95,6 +138,17 @@ export const manifests: Record<string, VizManifest> = {
     description: "One figure, with its change against the comparison period.",
     channels: {
       x: { accepts: "measure", required: true, count: 1 },
+    },
+    options: {
+      size: { type: "select", label: "Figure size", default: "large",
+        choices: [{ value: "medium", label: "Medium" }, { value: "large", label: "Large" },
+                  { value: "hero", label: "Hero" }] },
+      showDelta: { type: "boolean", label: "Change against comparison", default: true },
+      showPercent: { type: "boolean", label: "Percentage", default: true },
+      goodDirection: { type: "select", label: "Colour the change", default: "metric",
+        choices: [{ value: "metric", label: "By the metric's direction" },
+                  { value: "none", label: "Never (neutral)" }],
+        help: "The model already knows whether up is good. Override only for a deliberately neutral tile." },
     },
     goodFor: ["a single headline figure", "a total that leads a section"],
     notFor: [
@@ -116,6 +170,13 @@ export const manifests: Record<string, VizManifest> = {
       y: { accepts: "dimension", required: true, cardinality: [1, 30] },
       x: { accepts: "measure", required: true, count: 1 },
     },
+    options: {
+      threshold: { type: "number", label: "Outside-normal threshold", default: 2,
+        min: 0.5, max: 5, step: 0.5,
+        help: "Standard deviations before a mover is called out. Lower means a noisier page." },
+      showChips: { type: "boolean", label: "Mover chips", default: true },
+      maxChips: { type: "number", label: "Maximum chips", default: 8, min: 1, max: 20 },
+    },
     goodFor: [
       "the top of a page whose job is 'what changed, and why'",
       "stating the conclusion before the evidence",
@@ -136,6 +197,16 @@ export const manifests: Record<string, VizManifest> = {
       x: { accepts: "dimension", required: true, count: 1, note: "must be a time dimension" },
       y: { accepts: "measure", required: true, count: 1 },
       series: { accepts: "dimension", required: false, cardinality: [1, 5] },
+    },
+    options: {
+      showArea: { type: "boolean", label: "Area fill", default: false,
+        help: "Only honest for a measure that starts at zero." },
+      showEndpoint: { type: "boolean", label: "Emphasise the endpoint", default: true,
+        help: "The latest value is what the reader came for." },
+      strokeWidth: { type: "number", label: "Line weight", default: 1.75, min: 1, max: 4, step: 0.25 },
+      yFromZero: { type: "boolean", label: "Y axis from zero", default: true,
+        help: "Off exaggerates small movements. Turn off only deliberately." },
+      tickCount: { type: "number", label: "Y gridlines", default: 3, min: 2, max: 6 },
     },
     goodFor: ["shape and trend over many observations", "when the change is gradual"],
     notFor: [
@@ -159,6 +230,14 @@ export const manifests: Record<string, VizManifest> = {
       x: { accepts: "dimension", required: true, cardinality: [1, 12] },
       value: { accepts: "measure", required: true, count: 1 },
     },
+    options: {
+      showValues: { type: "boolean", label: "Print values in cells", default: true,
+        help: "Colour alone is unreadable for many viewers. Turn off only with a legend." },
+      intensity: { type: "number", label: "Colour intensity", default: 72, min: 20, max: 100, step: 4 },
+      scale: { type: "select", label: "Colour scale", default: "linear",
+        choices: [{ value: "linear", label: "Linear" }, { value: "sqrt", label: "Square root" }],
+        help: "Square root reveals detail when a few cells dominate." },
+    },
     goodFor: ["finding the hot cell in a two-way breakdown", "coverage and gaps"],
     notFor: [
       "precise comparison — colour cannot be read to two significant figures",
@@ -180,6 +259,12 @@ export const manifests: Record<string, VizManifest> = {
       y: { accepts: "dimension", required: true, cardinality: [1, 500] },
       x: { accepts: "measure", required: false },
     },
+    options: {
+      density: { type: "select", label: "Row density", default: "regular",
+        choices: [{ value: "compact", label: "Compact" }, { value: "regular", label: "Regular" }] },
+      zebra: { type: "boolean", label: "Alternating rows", default: false },
+      showRank: { type: "boolean", label: "Rank column", default: false },
+    },
     goodFor: ["exact lookup", "several metrics at once", "long tails"],
     notFor: ["showing shape or trend — a reader cannot see it in digits"],
     maxRows: 500,
@@ -193,6 +278,10 @@ export const manifests: Record<string, VizManifest> = {
     description:
       "Explains the selected mark, grounded in the compiled SQL, the returned rows and the metric definitions.",
     channels: {},
+    options: {
+      showSql: { type: "boolean", label: "Compiled SQL", default: true },
+      showDefinitions: { type: "boolean", label: "Metric definitions", default: true },
+    },
     goodFor: [
       "answering 'why did this move' next to the thing that moved",
       "showing the definition a figure was computed from",

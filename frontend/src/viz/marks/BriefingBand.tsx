@@ -1,9 +1,8 @@
 import SeverityChip from "../../primitives/SeverityChip";
 import { formatDate, formatDelta, formatValue } from "../../runtime/format";
 import { Table, type Group } from "../../runtime/table";
+import { bool, num } from "../options";
 import type { VizProps } from "../registry";
-
-const OUTSIDE_NORMAL = 2;
 
 function list(items: string[]): string {
   if (items.length <= 1) return items[0] ?? "";
@@ -18,11 +17,15 @@ function list(items: string[]): string {
  * assembled deterministically from the block's own rows — this is the
  * conclusion the data supports, not a generated guess about it.
  */
-export default function BriefingBand({ block, table, meta, onSelect }: VizProps) {
+export default function BriefingBand({ block, table, meta, onSelect, options }: VizProps) {
   if (!table) return null;
 
   const groups = table.groups();
   if (!groups.length) return <p className="vd-empty">Nothing to report for this selection.</p>;
+
+  const OUTSIDE_NORMAL = num(options, "threshold", 2);
+  const showChips = bool(options, "showChips", true);
+  const maxChips = num(options, "maxChips", 8);
 
   const xName = block.encode?.x ?? table.metrics[0]?.name ?? "";
   const xCol = table.column(xName);
@@ -86,11 +89,12 @@ export default function BriefingBand({ block, table, meta, onSelect }: VizProps)
         </p>
       )}
 
-      {outside.length > 0 && (
+      {outside.length > 0 && showChips && (
         <div className="vd-briefing__chips">
           {outside
             .slice()
             .sort((a, b) => Math.abs(sev(b)) - Math.abs(sev(a)))
+            .slice(0, maxChips)
             .map((g) => (
               <button
                 key={g.key}

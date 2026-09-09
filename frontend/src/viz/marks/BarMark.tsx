@@ -1,15 +1,21 @@
 import DeltaChip from "../../primitives/DeltaChip";
 import { formatDate, formatValue } from "../../runtime/format";
 import { Table } from "../../runtime/table";
+import { bool, num } from "../options";
 import type { VizProps } from "../registry";
 
 /** Ranked magnitude. When a comparison exists, the previous period is a quiet
  *  outline behind the bar rather than a second competing bar. */
-export default function BarMark({ block, table, meta, selected, onSelect }: VizProps) {
+export default function BarMark({ block, table, meta, selected, onSelect, options }: VizProps) {
   if (!table) return null;
 
   const groups = table.groups();
   if (!groups.length) return <p className="vd-empty">No rows for this selection.</p>;
+
+  const showGhost = bool(options, "showGhost", true);
+  const showValue = bool(options, "showValue", true);
+  const showDelta = bool(options, "showDelta", true);
+  const labelWidth = num(options, "labelWidth", 130);
 
   const xName = block.encode?.x ?? table.metrics[0]?.name ?? "";
   const xCol = table.column(xName);
@@ -41,6 +47,7 @@ export default function BarMark({ block, table, meta, selected, onSelect }: VizP
             <li key={g.key}>
               <button
                 type="button"
+                style={{ gridTemplateColumns: `${labelWidth}px minmax(60px, 1fr) 58px auto` }}
                 className={`vd-bars__row${isSelected ? " is-selected" : ""}`}
                 onClick={() => onSelect(g)}
                 aria-pressed={isSelected}
@@ -49,7 +56,7 @@ export default function BarMark({ block, table, meta, selected, onSelect }: VizP
                   {g.label}
                 </span>
                 <span className="vd-bars__track">
-                  {hasCompare && (
+                  {hasCompare && showGhost && (
                     <span
                       className="vd-bars__ghost"
                       style={{ width: `${(past / max) * 100}%` }}
@@ -57,8 +64,10 @@ export default function BarMark({ block, table, meta, selected, onSelect }: VizP
                   )}
                   <span className="vd-bars__fill" style={{ width: `${(now / max) * 100}%` }} />
                 </span>
-                <span className="vd-bars__value">{formatValue(now, xCol?.format)}</span>
-                {hasCompare && (
+                {showValue && (
+                  <span className="vd-bars__value">{formatValue(now, xCol?.format)}</span>
+                )}
+                {hasCompare && showDelta && (
                   <span className="vd-bars__delta">
                     <DeltaChip
                       current={now}

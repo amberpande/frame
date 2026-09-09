@@ -53,6 +53,14 @@ export const api = {
       `/models/${model}/dimensions/${encodeURIComponent(dimension)}/values`
     ),
 
+  /** Publishing a dashboard is a write to a row. The API re-validates every
+   *  block against the semantic model before storing it. */
+  saveSpec: (spec: DashboardSpec) =>
+    request<DashboardSpec>(`/specs/${spec.id}`, {
+      method: "PUT",
+      body: JSON.stringify(spec),
+    }),
+
   blockData: (
     specId: string,
     blockId: string,

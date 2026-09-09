@@ -3,6 +3,8 @@ import ParamBar from "./runtime/ParamBar";
 import SpecRenderer from "./runtime/SpecRenderer";
 import { api, getIdentity, setIdentity } from "./runtime/client";
 import { SelectionProvider } from "./runtime/selection";
+import Inspector from "./builder/Inspector";
+import { useEditor } from "./builder/useEditor";
 import type { DashboardSpec, SpecSummary } from "./spec/types";
 
 const IDENTITIES = [
@@ -19,6 +21,12 @@ export default function App() {
   const [resolved, setResolved] = useState<Record<string, unknown>>({});
   const [identity, setIdentityState] = useState(getIdentity());
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // What is edited is exactly what renders: the draft replaces the spec
+  // in the tree, so the preview is the real runtime, not an approximation.
+  const editor = useEditor(spec, () => setReloadKey((k) => k + 1));
+  const live = editor.draft ?? spec;
 
   useEffect(() => {
     api
@@ -38,7 +46,7 @@ export default function App() {
       .spec(specId)
       .then(setSpec)
       .catch((e: Error) => setError(e.message));
-  }, [specId, identity]);
+  }, [specId, identity, reloadKey]);
 
   const changeIdentity = (id: string) => {
     setIdentity(id);
@@ -73,6 +81,12 @@ export default function App() {
               </select>
             </label>
 
+            {spec && !editor.editing && (
+              <button type="button" className="vd-btn vd-btn--ghost" onClick={editor.start}>
+                Edit
+              </button>
+            )}
+
             <label className="vd-field">
               <span>Viewing as</span>
               <select
@@ -93,42 +107,90 @@ export default function App() {
 
         {error && <p className="vd-fatal">{error}</p>}
 
-        {spec && (
+        {editor.editing && (
+          <div className="vd-editbar">
+            <span className="vd-editbar__state">
+              Editing <code>{live?.id}</code>
+              {editor.dirty ? " · unsaved changes" : " · no changes"}
+            </span>
+            {editor.error && <span className="vd-editbar__error">{editor.error}</span>}
+            <div className="vd-editbar__actions">
+              <button
+                type="button"
+                className="vd-btn vd-btn--ghost"
+                onClick={() => navigator.clipboard?.writeText(JSON.stringify(live, null, 2))}
+              >
+                Copy JSON
+              </button>
+              <button type="button" className="vd-btn vd-btn--ghost" onClick={editor.cancel}>
+                Discard
+              </button>
+              <button
+                type="button"
+                className="vd-btn"
+                disabled={!editor.dirty || editor.saving}
+                onClick={editor.save}
+              >
+                {editor.saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {live && (
           <main className="vd-main">
             <div className="vd-pagehead">
               <div>
-                <h1>{spec.title}</h1>
-                {spec.description && <p className="vd-pagehead__sub">{spec.description}</p>}
+                <h1>{live.title}</h1>
+                {live.description && <p className="vd-pagehead__sub">{live.description}</p>}
               </div>
               <dl className="vd-specmeta">
                 <div>
                   <dt>spec</dt>
                   <dd>
-                    {spec.id} · v{spec.specVersion}
+                    {live.id} · v{live.specVersion}
                   </dd>
                 </div>
                 <div>
                   <dt>model</dt>
-                  <dd>{spec.model}</dd>
+                  <dd>{live.model}</dd>
                 </div>
                 <div>
                   <dt>freshness</dt>
-                  <dd>{spec.freshness}</dd>
+                  <dd>{live.freshness}</dd>
                 </div>
               </dl>
             </div>
 
-            <ParamBar spec={spec} params={params} resolved={resolved} onChange={setParams} />
+            <ParamBar spec={live} params={params} resolved={resolved} onChange={setParams} />
 
-            <SpecRenderer spec={spec} params={params} onResolved={setResolved} />
+            <div className={editor.editing ? "vd-workspace" : undefined}>
+              <div className="vd-workspace__canvas">
+                <SpecRenderer
+                  spec={live}
+                  params={params}
+                  onResolved={setResolved}
+                  editor={editor.editing ? editor : undefined}
+                />
+              </div>
+              {editor.editing && (
+                <Inspector
+                  spec={live}
+                  block={live.blocks.find((b) => b.id === editor.selectedId) ?? null}
+                  editor={editor}
+                />
+              )}
+            </div>
 
-            <footer className="vd-foot">
-              <p>
-                Every block above was drawn from{" "}
-                <code>backend/specs/{spec.id}.json</code> — a row, not a repository.
-                Nothing here is specific to this dashboard.
-              </p>
-            </footer>
+            {!editor.editing && (
+              <footer className="vd-foot">
+                <p>
+                  Every block above was drawn from{" "}
+                  <code>backend/specs/{live.id}.json</code> — a row, not a repository.
+                  Nothing here is specific to this dashboard.
+                </p>
+              </footer>
+            )}
           </main>
         )}
       </div>

@@ -52,12 +52,30 @@ class SpecRegistry:
         self._parsed[spec_id] = (mtime, spec)
         return spec
 
+    # Written on every save, whatever the caller sent.
+    ALWAYS = ("$schema", "id", "specVersion", "model", "title", "freshness")
+
     def put(self, spec: DashboardSpec) -> DashboardSpec:
+        """Write the spec back as a clean, hand-editable document.
+
+        Defaults are omitted. A round-trip through the builder must not bloat a
+        spec with `"filters": []` and `"multi": false` on every node: these rows
+        are read, diffed and edited by people, and a save that triples the file
+        makes every later review harder.
+        """
         with self._lock:
-            payload = spec.model_dump(mode="json", by_alias=True, exclude_none=True)
+            body = spec.model_dump(
+                mode="json", by_alias=True, exclude_none=True, exclude_defaults=True
+            )
+            full = spec.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+            payload = {k: full[k] for k in self.ALWAYS if k in full}
+            payload.update({k: v for k, v in body.items() if k not in payload})
+
             self._path(spec.id).write_text(
                 json.dumps(payload, indent=2) + "\n", encoding="utf-8"
             )
+            self._parsed.pop(spec.id, None)
         return spec
 
     def delete(self, spec_id: str) -> None:
