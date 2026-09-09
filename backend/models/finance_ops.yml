@@ -1,0 +1,319 @@
+# L1 — the semantic model.
+#
+# This file is the platform's vocabulary. The compiler turns it into SQL, the
+# builder turns it into drop targets, and the agent is allowed to reference
+# nothing outside it. Every metric needs an owner and at least one test.
+#
+# Keep it small deliberately. The failure mode of a semantic layer is 1,200
+# metrics with four spellings of revenue — the original problem in better
+# syntax. Adding one should require an owner and a review.
+name: finance_ops
+version: 2
+label: Finance Operations
+description: >
+  Exception and control metrics for accounts payable, receivable and master
+  data. Grain is one row per exception per as-of date.
+
+sources:
+  fct_exception:
+    # `relation` is what ships to Snowflake; `local` is the DuckDB fixture used
+    # for development so the whole stack runs with no warehouse credentials.
+    relation: ANALYTICS.OPS.FCT_EXCEPTION
+    local: fct_exception
+    time_column: as_of_date
+
+  agg_team_sla:
+    # A pre-aggregated daily summary, grained only to team. Metrics sourced
+    # here genuinely cannot be sliced by reason code or region — the grain
+    # guard turns what would be a silently-wrong answer into a rejection.
+    relation: ANALYTICS.OPS.AGG_TEAM_SLA
+    local: agg_team_sla
+    time_column: as_of_date
+
+dimensions:
+  - name: exception.team
+    label: Team
+    source: fct_exception
+    column: team
+    synonyms: [team, "owning team", department]
+
+  - name: exception.reason_code
+    label: Reason code
+    source: fct_exception
+    column: reason_code
+    synonyms: [reason, "exception type", "break type"]
+
+  - name: exception.region
+    label: Region
+    source: fct_exception
+    column: region
+    synonyms: [region, geography, market]
+
+  - name: exception.process
+    label: Process
+    source: fct_exception
+    column: process
+    synonyms: [process, workflow, "process area"]
+
+  - name: exception.entity
+    label: Legal entity
+    source: fct_exception
+    column: entity
+    synonyms: [entity, "legal entity", company, "booking entity"]
+
+  - name: exception.vendor_tier
+    label: Vendor tier
+    source: fct_exception
+    column: vendor_tier
+    synonyms: ["vendor tier", "supplier tier", tier]
+    description: Strategic, Preferred or Tail, from the vendor master.
+
+  - name: exception.priority
+    label: Priority
+    source: fct_exception
+    column: priority
+    synonyms: [priority, severity band, "P1 P2 P3"]
+
+  - name: exception.as_of_date
+    label: As-of date
+    source: fct_exception
+    column: as_of_date
+    kind: time
+    synonyms: [date, day, "as of"]
+
+  - name: sla.team
+    label: Team (SLA)
+    source: agg_team_sla
+    column: team
+    synonyms: [team, "owning team"]
+
+  - name: sla.as_of_date
+    label: As-of date (SLA)
+    source: agg_team_sla
+    column: as_of_date
+    kind: time
+    synonyms: [date, day]
+
+# The full grain of the exception fact, repeated on each measure sourced from
+# it. Written out rather than defaulted, because the grain is the contract the
+# guard enforces and an implicit one is not worth much.
+x-exception-grain: &exception_grain
+  [
+    exception.as_of_date,
+    exception.team,
+    exception.reason_code,
+    exception.region,
+    exception.process,
+    exception.entity,
+    exception.vendor_tier,
+    exception.priority,
+  ]
+
+metrics:
+  - name: exception.count
+    label: Open exceptions
+    kind: measure
+    source: fct_exception
+    agg: count_distinct
+    column: exception_id
+    filters:
+      - "status IN ('OPEN', 'PENDING')"
+    grain: *exception_grain
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative, no_gaps_by_day]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: [exceptions, "open items", breaks, "open breaks", backlog]
+    baseline:
+      window_days: 28
+      stats: [avg, stddev]
+
+  - name: exception.closed_count
+    label: Closed
+    kind: measure
+    source: fct_exception
+    agg: count_distinct
+    column: exception_id
+    filters:
+      - "status = 'CLOSED'"
+    grain: *exception_grain
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: higher_is_better
+    synonyms: [closed, resolved, cleared]
+
+  - name: exception.aged_over_30
+    label: Aged over 30 days
+    kind: measure
+    source: fct_exception
+    agg: count_distinct
+    column: exception_id
+    filters:
+      - "status IN ('OPEN', 'PENDING')"
+      - "age_days > 30"
+    grain: *exception_grain
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: [aged, stale, "over 30", "long outstanding"]
+    baseline:
+      window_days: 28
+      stats: [avg, stddev]
+
+  - name: exception.p1_count
+    label: P1 exceptions
+    kind: measure
+    source: fct_exception
+    agg: count_distinct
+    column: exception_id
+    filters:
+      - "status IN ('OPEN', 'PENDING')"
+      - "priority = 'P1'"
+    grain: *exception_grain
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: [P1, critical, urgent]
+
+  - name: exception.aging_days
+    label: Average age
+    kind: measure
+    source: fct_exception
+    agg: avg
+    column: age_days
+    filters:
+      - "status IN ('OPEN', 'PENDING')"
+    grain: *exception_grain
+    format: { style: decimal, precision: 1, unit: days }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: [age, aging, "days open"]
+
+  - name: exception.value_usd
+    label: Exposure
+    kind: measure
+    source: fct_exception
+    agg: sum
+    column: amount_usd
+    filters:
+      - "status IN ('OPEN', 'PENDING')"
+    grain: *exception_grain
+    format: { style: currency, currency: USD, compact: true }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: [exposure, value, "dollar impact", amount]
+
+  - name: exception.resolution_rate
+    label: Resolution rate
+    kind: derived
+    expr: "{exception.closed_count} / NULLIF({exception.closed_count} + {exception.count}, 0)"
+    format: { style: percent, precision: 1 }
+    owner: fin-ops-platform
+    tests: [between_zero_and_one]
+    cost_class: cheap
+    direction: higher_is_better
+    synonyms: ["resolution rate", "clear rate", "% closed"]
+
+  - name: exception.value_per_item
+    label: Average exposure
+    kind: derived
+    expr: "{exception.value_usd} / NULLIF({exception.count}, 0)"
+    format: { style: currency, currency: USD }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: ["average value", "exposure per item", "average exposure"]
+
+  - name: exception.aged_share
+    label: Share aged over 30
+    kind: derived
+    expr: "{exception.aged_over_30} / NULLIF({exception.count}, 0)"
+    format: { style: percent, precision: 1 }
+    owner: fin-ops-platform
+    tests: [between_zero_and_one]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: ["aged share", "% aged", "stale share"]
+
+  - name: sla.breached
+    label: Breached items
+    kind: measure
+    source: agg_team_sla
+    agg: sum
+    column: breached_count
+    grain: [sla.as_of_date, sla.team]
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: ["sla breaches", "late items"]
+
+  - name: sla.total
+    label: Items in scope
+    kind: measure
+    source: agg_team_sla
+    agg: sum
+    column: total_count
+    grain: [sla.as_of_date, sla.team]
+    format: { style: integer }
+    owner: fin-ops-platform
+    tests: [non_negative]
+    cost_class: cheap
+    direction: neutral
+    synonyms: ["items in scope", "sla population"]
+
+  - name: sla.breach_rate
+    label: SLA breach rate
+    kind: derived
+    expr: "{sla.breached} / NULLIF({sla.total}, 0)"
+    format: { style: percent, precision: 1 }
+    owner: fin-ops-platform
+    tests: [between_zero_and_one]
+    cost_class: cheap
+    direction: lower_is_better
+    synonyms: ["breach rate", "sla %", "on time rate"]
+    note: >
+      Sourced from a daily summary grained to team only. It cannot be sliced by
+      reason code or region; ask for exception.count if you need that cut.
+
+  # Derived: the ranking metric. This used to live in the dashboard's
+  # TypeScript, which meant every dashboard reimplemented it and the agent had
+  # no stable name to reference. It is a governed definition now.
+  - name: severity.signed_z
+    label: Severity
+    kind: derived
+    expr: "({exception.count} - {exception.count@avg_28d}) / NULLIF({exception.count@stddev_28d}, 0)"
+    format: { style: decimal, precision: 2, unit: "σ" }
+    owner: fin-ops-platform
+    tests: [finite]
+    cost_class: cheap
+    direction: neutral
+    synonyms: [severity, "z score", "how unusual", anomaly]
+    note: >
+      Signed. A large improvement ranks as high as a large regression, because
+      both are equally far outside normal, but an improvement is never styled
+      as a warning. Rank on absolute value; colour on sign.
+
+  - name: severity.aged_z
+    label: Aging severity
+    kind: derived
+    expr: "({exception.aged_over_30} - {exception.aged_over_30@avg_28d}) / NULLIF({exception.aged_over_30@stddev_28d}, 0)"
+    format: { style: decimal, precision: 2, unit: "σ" }
+    owner: fin-ops-platform
+    tests: [finite]
+    cost_class: cheap
+    direction: neutral
+    synonyms: ["aging severity", "aged anomaly"]

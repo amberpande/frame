@@ -1,0 +1,517 @@
+{
+  "$defs": {
+    "AgentBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "grounding": {
+          "items": {
+            "enum": [
+              "query.sql",
+              "query.result",
+              "model.definitions",
+              "block.selection"
+            ],
+            "type": "string"
+          },
+          "title": "Grounding",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "AgentBinding",
+      "type": "object"
+    },
+    "Block": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "viz": {
+          "title": "Viz",
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/$defs/Placement"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "subtitle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subtitle"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuerySpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "encode": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Encode",
+          "type": "object"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SortSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlockSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "options": {
+          "additionalProperties": true,
+          "title": "Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "viz",
+        "at"
+      ],
+      "title": "Block",
+      "type": "object"
+    },
+    "BlockSource": {
+      "additionalProperties": false,
+      "description": "Wires one block's selection into another block.",
+      "properties": {
+        "block": {
+          "title": "Block",
+          "type": "string"
+        },
+        "on": {
+          "default": "select",
+          "enum": [
+            "select",
+            "hover",
+            "always"
+          ],
+          "title": "On",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block"
+      ],
+      "title": "BlockSource",
+      "type": "object"
+    },
+    "FilterClause": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "op": {
+          "default": "eq",
+          "enum": [
+            "eq",
+            "ne",
+            "in",
+            "not_in",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "contains"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "FilterClause",
+      "type": "object"
+    },
+    "Freshness": {
+      "description": "Picks the serving tier. See frame.serve.tiers.",
+      "enum": [
+        "daily",
+        "hourly",
+        "near_real_time",
+        "live"
+      ],
+      "title": "Freshness",
+      "type": "string"
+    },
+    "Param": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "date",
+            "dimension",
+            "measure",
+            "string",
+            "number",
+            "boolean"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "default": {
+          "default": null,
+          "title": "Default"
+        },
+        "of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Of"
+        },
+        "multi": {
+          "default": false,
+          "title": "Multi",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "Param",
+      "type": "object"
+    },
+    "Placement": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "maximum": 11,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        },
+        "w": {
+          "maximum": 12,
+          "minimum": 1,
+          "title": "W",
+          "type": "integer"
+        },
+        "h": {
+          "minimum": 1,
+          "title": "H",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "title": "Placement",
+      "type": "object"
+    },
+    "QuerySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metrics",
+          "type": "array"
+        },
+        "by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "By",
+          "type": "array"
+        },
+        "filters": {
+          "items": {
+            "$ref": "#/$defs/FilterClause"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "compare": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compare"
+        },
+        "windowDays": {
+          "anyOf": [
+            {
+              "maximum": 1826,
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Windowdays"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SortSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "metrics"
+      ],
+      "title": "QuerySpec",
+      "type": "object"
+    },
+    "SortSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "title": "By",
+          "type": "string"
+        },
+        "dir": {
+          "default": "desc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Dir",
+          "type": "string"
+        },
+        "abs": {
+          "default": false,
+          "title": "Abs",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "by"
+      ],
+      "title": "SortSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "specVersion": {
+      "default": 1,
+      "title": "Specversion",
+      "type": "integer"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "freshness": {
+      "$ref": "#/$defs/Freshness",
+      "default": "daily"
+    },
+    "justification": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Justification"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "params": {
+      "items": {
+        "$ref": "#/$defs/Param"
+      },
+      "title": "Params",
+      "type": "array"
+    },
+    "blocks": {
+      "items": {
+        "$ref": "#/$defs/Block"
+      },
+      "minItems": 1,
+      "title": "Blocks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "model",
+    "title",
+    "blocks"
+  ],
+  "title": "Frame dashboard spec (v1)",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frame.internal/schemas/spec.schema.json",
+  "description": "A dashboard, as data. Metrics and dimensions must exist in the semantic model named by `model`; POST /api/v1/validate checks a query without reading a row. No spec may contain SQL."
+}

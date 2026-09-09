@@ -1,0 +1,121 @@
+/* The design system, as tokens.
+ *
+ * Ported from the variance-dashboard-design skill. The `--vd-` prefix is
+ * deliberate and must not be shortened: these tokens have to be able to drop
+ * into a host app without colliding with its own variables.
+ *
+ * Structure matters as much as the values. The bare :root block defines the
+ * complete light palette; the dark blocks redefine only token values. A colour
+ * whose only definition sits inside a media query is the classic unreadable
+ * bug.
+ */
+
+:root {
+  /* surfaces */
+  --vd-paper: #f4f6f6;
+  --vd-surface: #ffffff;
+  --vd-surface-2: #eaeeed;
+  --vd-inset: #eff3f2;
+
+  /* ink */
+  --vd-ink: #111a1b;
+  --vd-ink-2: #37474a;
+  --vd-muted: #647476;
+
+  /* structure */
+  --vd-rule: #d5dcdb;
+  --vd-rule-2: #b7c3c2;
+
+  /* accent */
+  --vd-accent: #0b6e63;
+  --vd-accent-soft: #dcedea;
+  --vd-accent-ink: #06504a;
+
+  /* semantic — separate from the accent, and signed */
+  --vd-good: #2b7a58;
+  --vd-good-soft: #ddeee6;
+  --vd-warn: #8b6205;
+  --vd-warn-soft: #f6ecd6;
+  --vd-bad: #a83a31;
+  --vd-bad-soft: #f7e2e0;
+
+  /* marks */
+  --vd-mark-past: #a4b3b2;
+  --vd-mark-now: #0b6e63;
+
+  /* type */
+  --vd-sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --vd-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  /* scale */
+  --vd-radius: 3px;
+  --vd-gap: 14px;
+  --vd-shadow: 0 1px 2px rgba(17, 26, 27, 0.05),
+    0 12px 30px -24px rgba(17, 26, 27, 0.5);
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vd-paper: #0c1313;
+    --vd-surface: #121b1b;
+    --vd-surface-2: #182322;
+    --vd-inset: #0f1817;
+
+    --vd-ink: #e6edec;
+    --vd-ink-2: #b6c4c3;
+    --vd-muted: #89999a;
+
+    --vd-rule: #22302f;
+    --vd-rule-2: #334140;
+
+    --vd-accent: #51c6b3;
+    --vd-accent-soft: #12302c;
+    --vd-accent-ink: #93e2d5;
+
+    --vd-good: #5fc08f;
+    --vd-good-soft: #12291f;
+    --vd-warn: #d3a241;
+    --vd-warn-soft: #2b2314;
+    --vd-bad: #e37b6f;
+    --vd-bad-soft: #2e1917;
+
+    --vd-mark-past: #4d5f5e;
+    --vd-mark-now: #51c6b3;
+
+    --vd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -24px rgba(0, 0, 0, 0.9);
+  }
+}
+
+:root[data-theme="dark"] {
+  --vd-paper: #0c1313;
+  --vd-surface: #121b1b;
+  --vd-surface-2: #182322;
+  --vd-inset: #0f1817;
+
+  --vd-ink: #e6edec;
+  --vd-ink-2: #b6c4c3;
+  --vd-muted: #89999a;
+
+  --vd-rule: #22302f;
+  --vd-rule-2: #334140;
+
+  --vd-accent: #51c6b3;
+  --vd-accent-soft: #12302c;
+  --vd-accent-ink: #93e2d5;
+
+  --vd-good: #5fc08f;
+  --vd-good-soft: #12291f;
+  --vd-warn: #d3a241;
+  --vd-warn-soft: #2b2314;
+  --vd-bad: #e37b6f;
+  --vd-bad-soft: #2e1917;
+
+  --vd-mark-past: #4d5f5e;
+  --vd-mark-now: #51c6b3;
+
+  --vd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -24px rgba(0, 0, 0, 0.9);
+}

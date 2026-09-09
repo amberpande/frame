@@ -1,0 +1,357 @@
+{
+  "$schema": "../schemas/spec.schema.json",
+  "id": "ops-control-tower",
+  "specVersion": 1,
+  "model": "finance_ops",
+  "title": "Operations control tower",
+  "description": "The whole exception estate on one page: what changed, where it is concentrated, and what is going stale.",
+  "freshness": "daily",
+  "owner": "fin-ops-platform",
+  "tags": [
+    "finance",
+    "controls",
+    "operations",
+    "flagship"
+  ],
+  "params": [
+    {
+      "name": "as_of",
+      "type": "date",
+      "label": "As of",
+      "default": "@latest_close"
+    },
+    {
+      "name": "compare_to",
+      "type": "date",
+      "label": "Compared to",
+      "default": "@as_of - 7d"
+    },
+    {
+      "name": "region",
+      "type": "dimension",
+      "label": "Region",
+      "of": "exception.region",
+      "multi": true
+    },
+    {
+      "name": "vendor_tier",
+      "type": "dimension",
+      "label": "Vendor tier",
+      "of": "exception.vendor_tier",
+      "multi": true
+    },
+    {
+      "name": "entity",
+      "type": "dimension",
+      "label": "Entity",
+      "of": "exception.entity",
+      "multi": true
+    }
+  ],
+  "blocks": [
+    {
+      "id": "briefing",
+      "viz": "briefing.band",
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 3
+      },
+      "title": "What changed",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.team"
+        ],
+        "compare": "$compare_to"
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    },
+    {
+      "id": "kpi-open",
+      "viz": "big.number",
+      "at": {
+        "x": 0,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Open exceptions",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-p1",
+      "viz": "big.number",
+      "at": {
+        "x": 3,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "P1 exceptions",
+      "query": {
+        "metrics": [
+          "exception.p1_count"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-aged",
+      "viz": "big.number",
+      "at": {
+        "x": 6,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Aged over 30 days",
+      "query": {
+        "metrics": [
+          "exception.aged_over_30"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-resolution",
+      "viz": "big.number",
+      "at": {
+        "x": 9,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Resolution rate",
+      "query": {
+        "metrics": [
+          "exception.resolution_rate"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "trend",
+      "viz": "mark.line",
+      "at": {
+        "x": 0,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      },
+      "title": "Open exceptions, daily",
+      "subtitle": "Seventy-six observations, so a line is the honest mark here",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.as_of_date",
+          "exception.team"
+        ],
+        "filters": [
+          {
+            "field": "exception.team",
+            "op": "in",
+            "value": [
+              "Accounts Payable",
+              "Treasury",
+              "Compliance"
+            ]
+          }
+        ],
+        "windowDays": 76
+      },
+      "encode": {
+        "x": "exception.as_of_date",
+        "y": "exception.count",
+        "series": "exception.team"
+      }
+    },
+    {
+      "id": "by-entity",
+      "viz": "mark.bar",
+      "at": {
+        "x": 8,
+        "y": 5,
+        "w": 4,
+        "h": 5
+      },
+      "title": "By legal entity",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.entity"
+        ],
+        "compare": "$compare_to"
+      },
+      "encode": {
+        "y": "exception.entity",
+        "x": "exception.count"
+      },
+      "sort": {
+        "by": "exception.count",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "movers",
+      "viz": "mark.dumbbell",
+      "at": {
+        "x": 0,
+        "y": 10,
+        "w": 8,
+        "h": 7
+      },
+      "title": "Biggest movers by reason code",
+      "subtitle": "Ranked by deviation from the 28-day normal, not raw size",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "compare": "$compare_to",
+        "limit": 12
+      },
+      "encode": {
+        "y": "exception.reason_code",
+        "x": "exception.count",
+        "series": "@period"
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    },
+    {
+      "id": "why",
+      "viz": "panel.explain",
+      "at": {
+        "x": 8,
+        "y": 10,
+        "w": 4,
+        "h": 7
+      },
+      "title": "Why did this move?",
+      "source": {
+        "block": "movers",
+        "on": "select"
+      },
+      "agent": {
+        "task": "variance-explain",
+        "grounding": [
+          "query.sql",
+          "query.result",
+          "model.definitions",
+          "block.selection"
+        ]
+      }
+    },
+    {
+      "id": "team-priority",
+      "viz": "mark.matrix",
+      "at": {
+        "x": 0,
+        "y": 17,
+        "w": 7,
+        "h": 6
+      },
+      "title": "Team by priority",
+      "subtitle": "Where the urgent work actually sits",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.team",
+          "exception.priority"
+        ]
+      },
+      "encode": {
+        "y": "exception.team",
+        "x": "exception.priority",
+        "value": "exception.count"
+      }
+    },
+    {
+      "id": "by-tier",
+      "viz": "mark.bar",
+      "at": {
+        "x": 7,
+        "y": 17,
+        "w": 5,
+        "h": 6
+      },
+      "title": "By vendor tier",
+      "subtitle": "Tail vendors generate most of the matching work",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.vendor_tier"
+        ],
+        "compare": "$compare_to"
+      },
+      "encode": {
+        "y": "exception.vendor_tier",
+        "x": "exception.count"
+      },
+      "sort": {
+        "by": "exception.count",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "detail",
+      "viz": "table.grid",
+      "at": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 7
+      },
+      "title": "Reason code detail",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "exception.p1_count",
+          "exception.aged_over_30",
+          "exception.aged_share",
+          "exception.value_usd",
+          "exception.value_per_item",
+          "exception.aging_days",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "limit": 20
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    }
+  ]
+}

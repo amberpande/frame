@@ -1,0 +1,27 @@
+[project]
+name = "frame"
+version = "0.1.0"
+description = "Dashboards as data: one runtime, N specs, over a governed semantic layer."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "duckdb>=1.1",
+]
+
+[project.optional-dependencies]
+snowflake = ["snowflake-connector-python>=3.12"]
+redis = ["redis>=5.0"]
+dev = ["pytest>=8.3", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["frame*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

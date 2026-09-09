@@ -1,0 +1,241 @@
+{
+  "$schema": "../schemas/spec.schema.json",
+  "id": "vendor-risk",
+  "specVersion": 1,
+  "model": "finance_ops",
+  "title": "Vendor risk explorer",
+  "description": "Click a vendor tier to filter the rest of the page. Every block below the driver declares it as its source.",
+  "freshness": "hourly",
+  "owner": "fin-ops-platform",
+  "tags": [
+    "finance",
+    "vendors",
+    "exploration"
+  ],
+  "params": [
+    {
+      "name": "as_of",
+      "type": "date",
+      "label": "As of",
+      "default": "@latest_close"
+    },
+    {
+      "name": "compare_to",
+      "type": "date",
+      "label": "Compared to",
+      "default": "@as_of - 14d"
+    },
+    {
+      "name": "region",
+      "type": "dimension",
+      "label": "Region",
+      "of": "exception.region",
+      "multi": true
+    }
+  ],
+  "blocks": [
+    {
+      "id": "kpi-open",
+      "viz": "big.number",
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "Open exceptions",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-exposure",
+      "viz": "big.number",
+      "at": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "Exposure",
+      "query": {
+        "metrics": [
+          "exception.value_usd"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-avg",
+      "viz": "big.number",
+      "at": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "Average exposure",
+      "query": {
+        "metrics": [
+          "exception.value_per_item"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "tiers",
+      "viz": "mark.bar",
+      "at": {
+        "x": 0,
+        "y": 2,
+        "w": 5,
+        "h": 5
+      },
+      "title": "Vendor tier",
+      "subtitle": "Click a bar to filter everything below",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.vendor_tier"
+        ],
+        "compare": "$compare_to"
+      },
+      "encode": {
+        "y": "exception.vendor_tier",
+        "x": "exception.count"
+      },
+      "sort": {
+        "by": "exception.count",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "reasons",
+      "viz": "mark.bar",
+      "at": {
+        "x": 5,
+        "y": 2,
+        "w": 7,
+        "h": 5
+      },
+      "title": "Reason code",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "compare": "$compare_to",
+        "limit": 9
+      },
+      "encode": {
+        "y": "exception.reason_code",
+        "x": "exception.count"
+      },
+      "sort": {
+        "by": "exception.count",
+        "dir": "desc"
+      },
+      "source": {
+        "block": "tiers",
+        "on": "select"
+      }
+    },
+    {
+      "id": "entity-priority",
+      "viz": "mark.matrix",
+      "at": {
+        "x": 0,
+        "y": 7,
+        "w": 6,
+        "h": 6
+      },
+      "title": "Entity by priority",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.entity",
+          "exception.priority"
+        ]
+      },
+      "encode": {
+        "y": "exception.entity",
+        "x": "exception.priority",
+        "value": "exception.count"
+      },
+      "source": {
+        "block": "tiers",
+        "on": "select"
+      }
+    },
+    {
+      "id": "tier-trend",
+      "viz": "mark.line",
+      "at": {
+        "x": 6,
+        "y": 7,
+        "w": 6,
+        "h": 6
+      },
+      "title": "Daily open exceptions",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.as_of_date"
+        ],
+        "windowDays": 76
+      },
+      "encode": {
+        "x": "exception.as_of_date",
+        "y": "exception.count"
+      },
+      "source": {
+        "block": "tiers",
+        "on": "select"
+      }
+    },
+    {
+      "id": "detail",
+      "viz": "table.grid",
+      "at": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 7
+      },
+      "title": "Reason detail",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "exception.value_usd",
+          "exception.value_per_item",
+          "exception.aged_share",
+          "exception.resolution_rate",
+          "exception.aging_days"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "limit": 20
+      },
+      "sort": {
+        "by": "exception.value_usd",
+        "dir": "desc"
+      },
+      "source": {
+        "block": "tiers",
+        "on": "select"
+      }
+    }
+  ]
+}

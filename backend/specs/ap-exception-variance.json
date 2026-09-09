@@ -1,0 +1,253 @@
+{
+  "$schema": "../schemas/spec.schema.json",
+  "id": "ap-exception-variance",
+  "specVersion": 1,
+  "model": "finance_ops",
+  "title": "AP exception variance",
+  "description": "What changed in open exceptions between two closes, and why.",
+  "freshness": "daily",
+  "owner": "fin-ops-platform",
+  "tags": [
+    "finance",
+    "controls",
+    "variance"
+  ],
+  "params": [
+    {
+      "name": "as_of",
+      "type": "date",
+      "label": "As of",
+      "default": "@latest_close"
+    },
+    {
+      "name": "compare_to",
+      "type": "date",
+      "label": "Compared to",
+      "default": "@as_of - 7d"
+    },
+    {
+      "name": "region",
+      "type": "dimension",
+      "label": "Region",
+      "of": "exception.region",
+      "multi": true
+    }
+  ],
+  "blocks": [
+    {
+      "id": "briefing",
+      "viz": "briefing.band",
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 3
+      },
+      "title": "What changed",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.team"
+        ],
+        "compare": "$compare_to"
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    },
+    {
+      "id": "totals",
+      "viz": "big.number",
+      "at": {
+        "x": 0,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Open exceptions",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "exposure",
+      "viz": "big.number",
+      "at": {
+        "x": 3,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Exposure",
+      "query": {
+        "metrics": [
+          "exception.value_usd"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "aging",
+      "viz": "big.number",
+      "at": {
+        "x": 6,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Average age",
+      "query": {
+        "metrics": [
+          "exception.aging_days"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "teams",
+      "viz": "big.number",
+      "at": {
+        "x": 9,
+        "y": 3,
+        "w": 3,
+        "h": 2
+      },
+      "title": "Worst team severity",
+      "query": {
+        "metrics": [
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.team"
+        ],
+        "limit": 1
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    },
+    {
+      "id": "movers",
+      "viz": "mark.dumbbell",
+      "at": {
+        "x": 0,
+        "y": 5,
+        "w": 8,
+        "h": 7
+      },
+      "title": "Biggest movers by reason code",
+      "subtitle": "Ranked by deviation from the 28-day normal, not raw size",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "compare": "$compare_to",
+        "limit": 12
+      },
+      "encode": {
+        "y": "exception.reason_code",
+        "x": "exception.count",
+        "series": "@period"
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    },
+    {
+      "id": "why",
+      "viz": "panel.explain",
+      "at": {
+        "x": 8,
+        "y": 5,
+        "w": 4,
+        "h": 7
+      },
+      "title": "Why did this move?",
+      "source": {
+        "block": "movers",
+        "on": "select"
+      },
+      "agent": {
+        "task": "variance-explain",
+        "grounding": [
+          "query.sql",
+          "query.result",
+          "model.definitions",
+          "block.selection"
+        ]
+      }
+    },
+    {
+      "id": "by-team",
+      "viz": "mark.bar",
+      "at": {
+        "x": 0,
+        "y": 12,
+        "w": 6,
+        "h": 6
+      },
+      "title": "Open exceptions by team",
+      "query": {
+        "metrics": [
+          "exception.count"
+        ],
+        "by": [
+          "exception.team"
+        ],
+        "compare": "$compare_to"
+      },
+      "encode": {
+        "y": "exception.team",
+        "x": "exception.count"
+      },
+      "sort": {
+        "by": "exception.count",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "detail",
+      "viz": "table.grid",
+      "at": {
+        "x": 6,
+        "y": 12,
+        "w": 6,
+        "h": 6
+      },
+      "title": "Reason code detail",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "exception.value_usd",
+          "exception.aging_days",
+          "severity.signed_z"
+        ],
+        "by": [
+          "exception.reason_code"
+        ],
+        "limit": 20
+      },
+      "sort": {
+        "by": "severity.signed_z",
+        "dir": "desc",
+        "abs": true
+      }
+    }
+  ]
+}

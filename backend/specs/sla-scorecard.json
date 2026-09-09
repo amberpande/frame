@@ -1,0 +1,189 @@
+{
+  "$schema": "../schemas/spec.schema.json",
+  "id": "sla-scorecard",
+  "specVersion": 1,
+  "model": "finance_ops",
+  "title": "SLA scorecard",
+  "description": "Two sources on one page. SLA metrics come from a daily summary grained to team; the detail comes from the exception fact.",
+  "freshness": "near_real_time",
+  "owner": "fin-ops-platform",
+  "tags": [
+    "finance",
+    "sla",
+    "controls"
+  ],
+  "params": [
+    {
+      "name": "as_of",
+      "type": "date",
+      "label": "As of",
+      "default": "@latest_close"
+    },
+    {
+      "name": "compare_to",
+      "type": "date",
+      "label": "Compared to",
+      "default": "@as_of - 28d"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "kpi-rate",
+      "viz": "big.number",
+      "at": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "SLA breach rate",
+      "query": {
+        "metrics": [
+          "sla.breach_rate"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-breached",
+      "viz": "big.number",
+      "at": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "Breached items",
+      "query": {
+        "metrics": [
+          "sla.breached"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "kpi-scope",
+      "viz": "big.number",
+      "at": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      },
+      "title": "Items in scope",
+      "query": {
+        "metrics": [
+          "sla.total"
+        ],
+        "compare": "$compare_to"
+      }
+    },
+    {
+      "id": "rate-trend",
+      "viz": "mark.line",
+      "at": {
+        "x": 0,
+        "y": 2,
+        "w": 12,
+        "h": 5
+      },
+      "title": "Breach rate by day",
+      "subtitle": "From ANALYTICS.OPS.AGG_TEAM_SLA \u2014 grained to team, so it cannot be cut by reason code",
+      "query": {
+        "metrics": [
+          "sla.breach_rate"
+        ],
+        "by": [
+          "sla.as_of_date"
+        ],
+        "windowDays": 76
+      },
+      "encode": {
+        "x": "sla.as_of_date",
+        "y": "sla.breach_rate"
+      }
+    },
+    {
+      "id": "by-team",
+      "viz": "mark.bar",
+      "at": {
+        "x": 0,
+        "y": 7,
+        "w": 6,
+        "h": 6
+      },
+      "title": "Breach rate by team",
+      "query": {
+        "metrics": [
+          "sla.breach_rate"
+        ],
+        "by": [
+          "sla.team"
+        ],
+        "compare": "$compare_to"
+      },
+      "encode": {
+        "y": "sla.team",
+        "x": "sla.breach_rate"
+      },
+      "sort": {
+        "by": "sla.breach_rate",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "sla-detail",
+      "viz": "table.grid",
+      "at": {
+        "x": 6,
+        "y": 7,
+        "w": 6,
+        "h": 6
+      },
+      "title": "SLA detail by team",
+      "query": {
+        "metrics": [
+          "sla.breached",
+          "sla.total",
+          "sla.breach_rate"
+        ],
+        "by": [
+          "sla.team"
+        ]
+      },
+      "sort": {
+        "by": "sla.breach_rate",
+        "dir": "desc"
+      }
+    },
+    {
+      "id": "aging-detail",
+      "viz": "table.grid",
+      "at": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 6
+      },
+      "title": "Aging detail, from the exception fact",
+      "subtitle": "A different source in the same dashboard \u2014 one block per source, since join paths are not declared yet",
+      "query": {
+        "metrics": [
+          "exception.count",
+          "exception.aged_over_30",
+          "exception.aged_share",
+          "exception.aging_days",
+          "severity.aged_z"
+        ],
+        "by": [
+          "exception.team"
+        ]
+      },
+      "sort": {
+        "by": "severity.aged_z",
+        "dir": "desc",
+        "abs": true
+      }
+    }
+  ]
+}
