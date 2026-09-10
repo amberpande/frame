@@ -63,6 +63,41 @@ python -m frame.introspect --list --like "FCT_%"
 
 ---
 
+## 1b. Read one relation properly first
+
+Before modelling anything, look at it:
+
+```bash
+python -m frame.introspect --describe V_OPEN_EXCEPTION   --database ANALYTICS --schema OPS
+```
+
+One report: row count, the time column and its range, every column with type,
+an approximate distinct count, sample values, a suggested role — and **for a
+view, the SQL it is defined by.**
+
+That last part matters more than everything else. Column types tell you the
+shape of the data; the view's SQL tells you what the business means by it.
+
+| In the view definition | What it is |
+|---|---|
+| `WHERE status IN ('OPEN','PENDING')` | The rule for what counts. Becomes `filters:` on the measure. |
+| `CASE WHEN age_days > 30 THEN 'Over 30 days' ...` | A dimension, with its buckets already named by someone who knew the domain. |
+| `CASE WHEN amount > 50000 THEN TRUE` | A flag someone decided mattered. |
+| a join | The view is already denormalised — model the view, not its sources. |
+| `SUM(...) ... GROUP BY a, b` | **Pre-aggregated.** Its `grain:` is exactly `a, b` and nothing else. |
+
+The last row is the one that causes silent wrongness: slicing a pre-aggregated
+relation outside its `GROUP BY` returns a number that looks fine and is not.
+The grain guard catches it later — but only if you set the grain correctly here.
+
+Introspection cannot infer any of this from column types. A human or an agent
+has to read the SQL, which is why the report prints it.
+
+For the agent-driven version of this whole workflow, see
+`.github/prompts/dashboard-from-warehouse.prompt.md`.
+
+---
+
 ## 2. Generate a draft model
 
 ```bash

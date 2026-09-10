@@ -20,9 +20,11 @@ everything on a single incident.
 
 from __future__ import annotations
 
+import csv
 import math
 import random
 import sys
+import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -193,9 +195,17 @@ def build() -> None:
         )
         """
     )
-    con.executemany(
-        "INSERT INTO fct_exception VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows
-    )
+    # Bulk load via CSV rather than executemany. Row-at-a-time insertion of
+    # ~28k rows took minutes on a loaded machine; COPY takes under a second and
+    # is what you would use against a real warehouse anyway.
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = Path(tmp) / "fct_exception.csv"
+        with staged.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        con.execute(
+            f"COPY fct_exception FROM '{staged.as_posix()}' "
+            "(FORMAT CSV, HEADER FALSE, DATEFORMAT '%Y-%m-%d')"
+        )
     con.execute("CREATE INDEX idx_fct_exception_date ON fct_exception(as_of_date)")
 
     # A pre-aggregated daily summary, grained to team only — the shape every
@@ -214,6 +224,35 @@ def build() -> None:
                 AS total_count
         FROM fct_exception
         GROUP BY 1, 2
+        """
+    )
+
+    # A view, because most of a real warehouse is views and their SQL carries
+    # the business rules that column types cannot: which rows count as "open",
+    # what the aging buckets are, how severity is banded.
+    con.execute("DROP VIEW IF EXISTS v_open_exception")
+    con.execute(
+        """
+        CREATE VIEW v_open_exception AS
+        SELECT
+            exception_id,
+            as_of_date,
+            team,
+            reason_code,
+            region,
+            entity,
+            vendor_tier,
+            priority,
+            age_days,
+            amount_usd,
+            CASE
+                WHEN age_days > 30 THEN 'Over 30 days'
+                WHEN age_days > 10 THEN '11 to 30 days'
+                ELSE '10 days or less'
+            END AS aging_bucket,
+            CASE WHEN amount_usd > 50000 THEN TRUE ELSE FALSE END AS is_material
+        FROM fct_exception
+        WHERE status IN ('OPEN', 'PENDING')
         """
     )
 

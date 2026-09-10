@@ -89,6 +89,7 @@ class Column:
     data_type: str
     nullable: bool = True
     cardinality: int | None = None
+    samples: list[str] = field(default_factory=list)
 
     @property
     def base(self) -> str:
@@ -122,6 +123,12 @@ class TableInfo:
     table: str
     columns: list[Column] = field(default_factory=list)
     row_count: int | None = None
+    is_view: bool = False
+    # For a view, the SQL it is defined by. This is the most useful thing in
+    # the whole report: column types say what shape the data is, but the view's
+    # WHERE and CASE clauses say what the business actually means by it.
+    definition: str | None = None
+    time_range: tuple[str, str] | None = None
 
     @property
     def relation(self) -> str:
@@ -158,7 +165,7 @@ def list_tables(
     return [(str(r[0]), str(r[1])) for r in engine.fetch_all(sql)]
 
 
-def describe(
+def describe_table(
     engine: Engine,
     table: str,
     schema: str | None = None,
@@ -221,6 +228,155 @@ def profile(engine: Engine, info: TableInfo, sample_days: int | None = 90) -> No
     for i, column in enumerate(candidates):
         value = row[i + 1]
         column.cardinality = int(value) if value is not None else None
+
+
+def read_definition(
+    engine: Engine,
+    table: str,
+    schema: str | None = None,
+    database: str | None = None,
+) -> str | None:
+    """The SQL a view is defined by, if it is a view.
+
+    `INFORMATION_SCHEMA.VIEWS.VIEW_DEFINITION` exists in both Snowflake and
+    DuckDB, so this is one code path.
+    """
+    sql = (
+        "SELECT view_definition "
+        f"FROM {_information_schema(database)}.VIEWS "
+        f"WHERE UPPER(table_name) = UPPER('{_safe(table)}')"
+    )
+    if schema:
+        sql += f" AND UPPER(table_schema) = UPPER('{_safe(schema)}')"
+    try:
+        rows = engine.fetch_all(sql)
+    except Exception:
+        return None
+    if not rows or rows[0][0] is None:
+        return None
+    return str(rows[0][0]).strip()
+
+
+def sample_values(
+    engine: Engine, info: TableInfo, per_column: int = 4, max_cardinality: int = 60
+) -> None:
+    """A few real values per low-cardinality column.
+
+    Types tell an agent a column is VARCHAR; the values tell it whether the
+    column is a status, a region or a free-text note — which is the difference
+    between a good dimension and a useless one.
+    """
+    dialect = get_dialect(engine.dialect)
+    for column in info.columns:
+        if column.is_skipped or column.is_numeric:
+            continue
+        if column.cardinality is not None and column.cardinality > max_cardinality:
+            continue
+        col = dialect.column(column.name)
+        try:
+            rows = engine.fetch_all(
+                f"SELECT DISTINCT {col} FROM {info.relation} "
+                f"WHERE {col} IS NOT NULL ORDER BY 1 LIMIT {per_column}"
+            )
+        except Exception:
+            continue
+        column.samples = [str(r[0]) for r in rows]
+
+
+def read_time_range(engine: Engine, info: TableInfo) -> None:
+    time_col = pick_time_column(info)
+    if not time_col:
+        return
+    dialect = get_dialect(engine.dialect)
+    col = dialect.column(time_col.name)
+    try:
+        row = engine.fetch_all(
+            f"SELECT MIN({col}), MAX({col}) FROM {info.relation}"
+        )[0]
+    except Exception:
+        return
+    if row[0] is not None:
+        info.time_range = (str(row[0])[:10], str(row[1])[:10])
+
+
+def describe(
+    engine: Engine,
+    table: str,
+    schema: str | None = None,
+    database: str | None = None,
+    profile_days: int | None = 90,
+) -> TableInfo:
+    """Everything about one relation, for an agent to read in one go."""
+    info = describe_table(engine, table, schema, database)
+    info.definition = read_definition(engine, table, schema, database)
+    info.is_view = info.definition is not None
+    profile(engine, info, profile_days)
+    read_time_range(engine, info)
+    sample_values(engine, info)
+    return info
+
+
+def render_describe(info: TableInfo) -> str:
+    """A compact markdown report. Written to be read by a coding agent, so it
+    leads with the things that change what the agent should do."""
+    lines: list[str] = []
+    kind = "view" if info.is_view else "table"
+    lines.append(f"# {info.relation}  ({kind})")
+    lines.append("")
+
+    if info.row_count is not None:
+        lines.append(f"- rows: {info.row_count:,}")
+    time_col = pick_time_column(info)
+    if time_col:
+        span = f" ({info.time_range[0]} to {info.time_range[1]})" if info.time_range else ""
+        lines.append(f"- time column: `{time_col.name}`{span}")
+    else:
+        lines.append("- time column: none - cannot be compared across dates or charted as a series")
+    lines.append("")
+
+    if info.definition:
+        lines.append("## Definition")
+        lines.append("")
+        lines.append("Read the WHERE and CASE clauses: they are the business rules.")
+        lines.append("A WHERE becomes a metric `filters:` entry; a CASE becomes a dimension.")
+        lines.append("")
+        lines.append("```sql")
+        lines.append(info.definition)
+        lines.append("```")
+        lines.append("")
+
+    lines.append("## Columns")
+    lines.append("")
+    lines.append("`distinct~` is a HyperLogLog estimate, not an exact count.")
+    lines.append("")
+    lines.append("| column | type | distinct~ | sample values | suggested role |")
+    lines.append("|---|---|---:|---|---|")
+    for c in info.columns:
+        card = f"{c.cardinality:,}" if c.cardinality is not None else ""
+        samples = ", ".join(c.samples[:4]) if c.samples else ""
+        lines.append(
+            f"| `{c.name}` | {c.base} | {card} | {samples} | {_suggest(c)} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _suggest(c: Column) -> str:
+    if c.is_skipped:
+        return "skip (not modelled)"
+    if c.is_time:
+        return "time dimension"
+    if c.is_bool:
+        return "dimension"
+    if c.is_numeric:
+        if ID_LIKE.search(c.name):
+            return "measure: count_distinct"
+        if RATE_LIKE.search(c.name) or DURATION_LIKE.search(c.name):
+            return "measure: avg"
+        return "measure: sum"
+    if c.cardinality is not None and c.cardinality > 500:
+        return "measure: count_distinct (too many values to group by)"
+    return "dimension"
 
 
 def pick_time_column(info: TableInfo) -> Column | None:
@@ -450,6 +606,12 @@ def main() -> None:
     parser.add_argument("--name", default="draft", help="semantic model name")
     parser.add_argument("--out", help="write YAML here; default is stdout")
     parser.add_argument("--list", action="store_true", help="list visible tables and exit")
+    parser.add_argument(
+        "--describe",
+        metavar="TABLE",
+        help="print everything about one table or view - columns, cardinality, "
+        "sample values, and the SQL a view is defined by - then exit",
+    )
     parser.add_argument("--rank-by-usage", action="store_true",
                         help="rank tables by real query volume (Snowflake)")
     parser.add_argument("--top", type=int, default=25, help="with --rank-by-usage")
@@ -470,6 +632,13 @@ def main() -> None:
             print(f"{str(row[0])[:50]:<52}{row[1]:>10,}{row[2]:>8}  {row[3]}")
         return
 
+    if args.describe:
+        info = describe(
+            engine, args.describe, args.schema, args.database, args.profile_days or None
+        )
+        print(render_describe(info))
+        return
+
     if args.list:
         found = list_tables(engine, args.schema, args.database, args.like)
         for schema, table in found:
@@ -488,7 +657,7 @@ def main() -> None:
     tables: list[TableInfo] = []
     for table in names:
         print(f"  reading {table}", file=sys.stderr)
-        info = describe(engine, table, args.schema, args.database)
+        info = describe_table(engine, table, args.schema, args.database)
         if not args.no_profile:
             profile(engine, info, args.profile_days or None)
         tables.append(info)

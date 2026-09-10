@@ -87,8 +87,16 @@ Ratios are `kind: derived` over other metrics — never a second `agg`.
 ```bash
 cd backend
 python -m frame.introspect --rank-by-usage --top 25          # what is actually queried
+python -m frame.introspect --describe V_ORDERS               # one relation, in full
 python -m frame.introspect --schema OPS --tables A,B --name ops --out models/ops.yml
 ```
+
+`--describe` prints the SQL a view is defined by. **Read it.** Its `WHERE`
+becomes a metric filter, its `CASE` expressions become dimensions, and a
+`GROUP BY` means the relation is pre-aggregated and its grain is exactly that
+list. None of it is inferable from column types.
+
+For the full procedure, use the `dashboard-from-warehouse` prompt/skill.
 
 Everything generated is `curated: false`. That is intentional and it works
 immediately; curation is a separate, incremental job.
