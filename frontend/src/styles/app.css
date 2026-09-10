@@ -1165,3 +1165,34 @@ code {
 .vd-calc__ok { margin: 0 0 9px; font-size: 10.5px; color: var(--vd-good); line-height: 1.45; }
 .vd-calc__error { margin: 0 0 9px; font-size: 10.5px; color: var(--vd-bad); line-height: 1.45; }
 .vd-calc__actions { display: flex; gap: 7px; justify-content: flex-end; }
+
+/* --------------------------------------------------- scratchpad SQL blocks */
+
+/* A number that did not come through the compiler should never look like one
+   that did. */
+.vd-ungoverned {
+  font-family: var(--vd-mono);
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: var(--vd-warn-soft);
+  color: var(--vd-warn);
+  border: 1px solid var(--vd-warn);
+  white-space: nowrap;
+}
+
+.vd-sql__input {
+  font-family: var(--vd-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  resize: vertical;
+  width: 100%;
+  tab-size: 2;
+}
+
+.vd-token--sql {
+  border-style: dashed;
+  border-color: var(--vd-warn);
+  color: var(--vd-warn);
+}

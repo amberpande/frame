@@ -81,10 +81,27 @@ export default function App() {
               </select>
             </label>
 
-            {spec && !editor.editing && (
-              <button type="button" className="vd-btn vd-btn--ghost" onClick={editor.start}>
-                Edit
-              </button>
+            {!editor.editing && (
+              <>
+                <button
+                  type="button"
+                  className="vd-btn vd-btn--ghost"
+                  onClick={() => {
+                    const name = window.prompt("Name the dashboard", "My dashboard");
+                    if (!name) return;
+                    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+                      .replace(/^-|-$/g, "") || "untitled";
+                    editor.startBlank(id, name, spec?.model ?? "finance_ops");
+                  }}
+                >
+                  New
+                </button>
+                {spec && (
+                  <button type="button" className="vd-btn vd-btn--ghost" onClick={editor.start}>
+                    Edit
+                  </button>
+                )}
+              </>
             )}
 
             <label className="vd-field">

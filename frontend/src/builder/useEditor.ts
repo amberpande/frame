@@ -13,6 +13,7 @@ export interface Editor {
   error: string | null;
 
   start: () => void;
+  startBlank: (id: string, title: string, model: string) => void;
   cancel: () => void;
   save: () => Promise<void>;
   select: (blockId: string | null) => void;
@@ -21,6 +22,7 @@ export interface Editor {
   setOptions: (blockId: string, options: ResolvedOptions) => void;
   place: (blockId: string, at: Placement) => void;
   addBlock: (viz: string) => void;
+  addSqlBlock: () => void;
   removeBlock: (blockId: string) => void;
 
   setCalculations: (metrics: CalculatedMetric[]) => void;
@@ -51,6 +53,36 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     setSelectedId(copy.blocks[0]?.id ?? null);
     setError(null);
   }, [spec]);
+
+  // A blank page. One placeholder block, because a spec must have at least one
+  // and an empty canvas with nothing to select is a dead end.
+  const startBlank = useCallback((id: string, title: string, model: string) => {
+    const blank: DashboardSpec = {
+      $schema: "../schemas/spec.schema.json",
+      id,
+      specVersion: 1,
+      model,
+      title,
+      freshness: "daily",
+      params: [
+        { name: "as_of", type: "date", label: "As of", default: "@latest_close" },
+        { name: "compare_to", type: "date", label: "Compared to", default: "@as_of - 7d" },
+      ],
+      blocks: [
+        {
+          id: "block-1",
+          viz: "table.grid",
+          at: { x: 0, y: 0, w: 12, h: 6 },
+          title: "New block",
+          sql: { sql: "SELECT 1 AS example" },
+        },
+      ],
+    };
+    setDraft(blank);
+    setBaseline("");          // everything is unsaved on a blank page
+    setSelectedId("block-1");
+    setError(null);
+  }, []);
 
   const cancel = useCallback(() => {
     setDraft(EMPTY);
@@ -143,6 +175,24 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     [mutate]
   );
 
+  const addSqlBlock = useCallback(() => {
+    let created = "";
+    mutate((d) => {
+      let n = 1;
+      while (d.blocks.some((b) => b.id === `sql-${n}`)) n += 1;
+      created = `sql-${n}`;
+      const bottom = d.blocks.reduce((m, b) => Math.max(m, b.at.y + b.at.h), 0);
+      d.blocks.push({
+        id: created,
+        viz: "table.grid",
+        at: { x: 0, y: bottom, w: 12, h: 6 },
+        title: "SQL block",
+        sql: { sql: "SELECT 1 AS example" },
+      });
+    });
+    if (created) setSelectedId(created);
+  }, [mutate]);
+
   const removeBlock = useCallback(
     (blockId: string) =>
       mutate((d) => {
@@ -188,6 +238,7 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     saving,
     error,
     start,
+    startBlank,
     cancel,
     save,
     select: setSelectedId,
@@ -195,6 +246,7 @@ export function useEditor(spec: DashboardSpec | null, onSaved?: () => void): Edi
     setOptions,
     place,
     addBlock,
+    addSqlBlock,
     removeBlock,
     setCalculations,
   };

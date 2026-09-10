@@ -35,6 +35,7 @@ Copyright 2026 Amber Pande.
 | [`docs/semantic-model.md`](docs/semantic-model.md) | Bootstrapping a model from an unmodelled warehouse, and curating it |
 | [`docs/snowflake-live.md`](docs/snowflake-live.md) | Live Snowflake connection, cost controls, what to tune |
 | [`docs/deployment.md`](docs/deployment.md) | **Running on ECS.** Why Redis is not a sidecar, sizing, what to watch |
+| [`docs/scratchpad-sql.md`](docs/scratchpad-sql.md) | Hand-written SQL blocks — the one condition that makes them safe |
 | [`AGENTS.md`](AGENTS.md) | Coding agents. Copilot also reads `.github/copilot-instructions.md`. |
 
 ## No semantic layer yet? Start here

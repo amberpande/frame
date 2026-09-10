@@ -18,6 +18,7 @@ from frame.semantic.expr import ExpressionError
 from frame.semantic.expr import validate_expression as validate_expr
 from frame.semantic.overlay import check_single_source, overlay, source_map
 from frame.serve import get_engine, serve
+from frame.serve import adhoc
 from frame.serve.tiers import ServedResult
 from frame.spec.schema import FilterClause, Freshness, QuerySpec
 
@@ -79,6 +80,37 @@ def block_data(
         raise HTTPException(
             status_code=404, detail=f"spec {spec_id!r} has no block {block_id!r}"
         ) from None
+
+    # A scratchpad block runs the viewer's own SQL, under the viewer's own
+    # warehouse role. It bypasses the compiler by design, so it is never cached
+    # across identities and it is tagged separately for cost attribution.
+    if block.sql is not None:
+        try:
+            result = adhoc.run(
+                get_engine(),
+                block.sql.sql,
+                identity,
+                row_cap=config.MAX_ROWS,
+                query_tag=f"frame:adhoc:{spec_id}:{block_id}",
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from None
+        return {
+            "columns": result.columns,
+            "rows": result.rows,
+            "meta": {
+                "planHash": "adhoc",
+                "queryTag": f"frame:adhoc:{spec_id}:{block_id}",
+                "tier": "warehouse",
+                "cached": False,
+                "governed": False,
+                "elapsedMs": round(result.elapsed_ms, 2),
+                "rowCount": result.row_count,
+                "rowCap": config.MAX_ROWS,
+                "ranAs": identity.warehouse_role,
+                "params": {},
+            },
+        }
 
     if block.query is None:
         raise HTTPException(

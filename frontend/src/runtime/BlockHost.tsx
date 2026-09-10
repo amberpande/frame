@@ -117,6 +117,17 @@ export default function BlockHost({
               </p>
             )}
           </div>
+          {state.meta?.governed === false && (
+            <span
+              className="vd-ungoverned"
+              title={
+                "Hand-written SQL. Not compiled, not governed by the semantic " +
+                "model, and run as " + (state.meta.ranAs ?? "the viewer") + "."
+              }
+            >
+              SQL
+            </span>
+          )}
           {meta && (
             <span
               className={`vd-tier vd-tier--${meta.tier}`}

@@ -11,10 +11,16 @@ a dashboard is a file, not a deploy.
 
 ## Hard rules
 
-1. **Never put SQL in a spec, a component, or the frontend.** The compiler
-   (`backend/frame/compile/compiler.py`) is the only code that writes SQL. If a
-   task seems to need SQL elsewhere, it needs a metric in the semantic model
-   instead.
+1. **Never write SQL in a component or the frontend.** The compiler
+   (`backend/frame/compile/compiler.py`) is the only code that *generates* SQL.
+   If a task seems to need SQL elsewhere, it almost always needs a metric in
+   the semantic model instead.
+
+   The one sanctioned exception is a **scratchpad block** (`block.sql`), where a
+   person writes the SQL themselves. It is ungoverned by design: no grain, no
+   compiler, no shared cache, and it executes under that viewer's own warehouse
+   role. Do not create one to work around a guard — if a governed query is being
+   refused, fix the query or add the definition. See `docs/scratchpad-sql.md`.
 2. **Never add a code path from the API or the agent to the warehouse that
    bypasses `frame.serve.tiers.serve()`.** Cost governance, row-level security
    and cache correctness are all properties of there being one path.
@@ -51,6 +57,7 @@ a dashboard is a file, not a deploy.
 | [`docs/semantic-model.md`](docs/semantic-model.md) | Adding a metric, or bootstrapping a model from an unmodelled warehouse |
 | [`docs/snowflake-live.md`](docs/snowflake-live.md) | Connecting to Snowflake, or investigating cost |
 | [`docs/deployment.md`](docs/deployment.md) | Deploying on ECS, caching topology, scaling |
+| [`docs/scratchpad-sql.md`](docs/scratchpad-sql.md) | Scratchpad SQL blocks and what they give up |
 | [`README.md`](README.md) | Setup and the decisions worth knowing |
 
 ## Common tasks

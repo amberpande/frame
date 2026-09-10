@@ -10,10 +10,13 @@ repository — adding one is a file, never a deploy.
 
 ## Never do these
 
-- **Never write SQL** in a spec, a React component, or anywhere outside
-  `backend/frame/compile/compiler.py`. That file is the only SQL writer in the
-  system, and cost governance, row-level security and cache correctness all
+- **Never write SQL** in a React component, or anywhere outside
+  `backend/frame/compile/compiler.py`. That file is the only SQL *generator* in
+  the system, and cost governance, row-level security and cache correctness all
   depend on it staying that way.
+- The one exception is a **scratchpad block** (`block.sql`), which holds SQL a
+  person wrote. Never add one to get around a guard: a refused governed query
+  means the query is wrong or the model is missing a definition.
 - **Never invent a metric or dimension name.** They come from
   `backend/models/*.yml` or `GET /api/v1/models/{name}`.
 - **Never delete or weaken a guard** in `backend/frame/compile/guard.py` to

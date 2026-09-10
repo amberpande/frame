@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../runtime/client";
 import type { Block, DashboardSpec, SemanticModel } from "../spec/types";
+import SqlEditor from "./SqlEditor";
 import { catalogue } from "../viz/registry";
 import { manifests, type OptionSpec } from "../viz/manifests";
 import { resolveOptions, type ResolvedOptions } from "../viz/options";
@@ -132,6 +133,12 @@ export default function Inspector({ spec, block, editor }: Props) {
           ))}
         </div>
       </Section>
+
+      {block.sql && (
+        <Section title="SQL">
+          <SqlEditor block={block} editor={editor} />
+        </Section>
+      )}
 
       {block.query && (
         <Section title="Query">
@@ -384,6 +391,14 @@ function AddBlock({ editor }: { editor: Editor }) {
             + {m.name}
           </button>
         ))}
+        <button
+          type="button"
+          className="vd-token vd-token--sql"
+          title="A block backed by SQL you write. Ungoverned, and run as you."
+          onClick={() => editor.addSqlBlock()}
+        >
+          + SQL block
+        </button>
       </div>
     </Section>
   );

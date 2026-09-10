@@ -86,6 +86,21 @@ class AgentBinding(Base):
     ] = Field(default_factory=list)
 
 
+class SqlSource(Base):
+    """Hand-written SQL for a scratchpad block.
+
+    Not governed: no grain, no declared metrics, no compiler. It executes under
+    the viewer's own warehouse role, so what it can read is bounded by their
+    grants rather than by anything in this codebase. A block carrying one is
+    marked as ungoverned wherever it appears.
+    """
+
+    sql: str = Field(min_length=1, max_length=20000)
+    # Why this is not a governed metric. Not enforced, but a spec full of
+    # unexplained SQL blocks is the signal that the model is missing something.
+    note: str | None = None
+
+
 class Block(Base):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     viz: str
@@ -93,6 +108,8 @@ class Block(Base):
     title: str | None = None
     subtitle: str | None = None
     query: QuerySpec | None = None
+    # Exactly one of `query`, `sql` or `source` drives a block.
+    sql: SqlSource | None = None
     encode: dict[str, str] = Field(default_factory=dict)
     sort: SortSpec | None = None
     source: BlockSource | None = None
@@ -170,9 +187,14 @@ class DashboardSpec(Base):
                 )
             if block.source and block.source.block == block.id:
                 raise ValueError(f"block {block.id!r} sources from itself")
-            if block.query is None and block.source is None:
+            if block.query is not None and block.sql is not None:
                 raise ValueError(
-                    f"block {block.id!r} has neither a query nor a source block"
+                    f"block {block.id!r} has both a governed query and raw SQL; "
+                    "it can have one or the other"
+                )
+            if block.query is None and block.sql is None and block.source is None:
+                raise ValueError(
+                    f"block {block.id!r} has no query, no SQL and no source block"
                 )
 
         param_names = {p.name for p in self.params}

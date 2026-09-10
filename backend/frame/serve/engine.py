@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -53,6 +54,15 @@ class Engine(ABC):
 
     @abstractmethod
     def fetch_all(self, sql: str, params: dict[str, Any] | None = None) -> list[tuple]: ...
+
+    @abstractmethod
+    def run_as(self, sql: str, identity: Any, *, query_tag: str) -> tuple[list[list], list[str]]:
+        """Execute hand-written SQL as a specific person.
+
+        Separate from `execute` on purpose: this path takes SQL the platform did
+        not write, so it must run under that person's own warehouse role. That
+        role, not any check in Python, is what bounds what they can read.
+        """
 
 
 def _serialize(value: Any) -> Any:
@@ -126,6 +136,17 @@ class DuckDBEngine(Engine):
         cur = self._cursor()
         cur.execute(sql, params or {})
         return [tuple(_serialize(v) for v in row) for row in cur.fetchall()]
+
+    def run_as(self, sql: str, identity: Any, *, query_tag: str) -> tuple[list[list], list[str]]:
+        # DuckDB has no roles, so local development cannot reproduce the real
+        # boundary. That is a property of the fixture, not of the design: role
+        # isolation has to be tested against Snowflake.
+        self.executes += 1
+        cur = self._cursor()
+        cur.execute(sql)
+        names = [d[0] for d in (cur.description or [])]
+        rows = [[_serialize(v) for v in row] for row in cur.fetchall()]
+        return rows, names
 
 
 class SnowflakeEngine(Engine):
@@ -228,6 +249,45 @@ class SnowflakeEngine(Engine):
         finally:
             cur.close()
         return _serialize(row[0]) if row else None
+
+    def run_as(self, sql: str, identity: Any, *, query_tag: str) -> tuple[list[list], list[str]]:
+        """Run under the caller's own role, not the service role.
+
+        `USE ROLE` requires the service user to have been granted that role.
+        Without one the query would run as the service account, so one person's
+        ad-hoc SQL could read everything the service can. Refuse rather than do
+        that silently.
+        """
+        role = getattr(identity, "warehouse_role", None)
+        if not role:
+            raise PermissionError(
+                f"{getattr(identity, 'subject', 'this identity')} has no warehouse_role; "
+                "refusing to run hand-written SQL as the shared service role"
+            )
+        if not re.fullmatch(r"[A-Za-z0-9_$]+", role):
+            raise PermissionError(f"illegal warehouse role {role!r}")
+
+        self.executes += 1
+        con = self._connection()
+        cur = con.cursor()
+        try:
+            cur.execute(f"USE ROLE {role}")
+            cur.execute("ALTER SESSION SET QUERY_TAG = %(tag)s", {"tag": query_tag})
+            cur.execute(sql)
+            names = [d[0] for d in (cur.description or [])]
+            rows = [[_serialize(v) for v in row] for row in cur.fetchall()]
+        finally:
+            cur.close()
+            # Connections are pooled per thread, so the assumed role must not
+            # leak into the next request that borrows this session.
+            restore = self._opts.get("role")
+            if restore:
+                try:
+                    con.cursor().execute(f"USE ROLE {restore}")
+                except Exception:
+                    self._local.con = None  # poisoned: force a fresh session
+            self._local.warehouse = None
+        return rows, names
 
     def fetch_all(self, sql: str, params: dict[str, Any] | None = None) -> list[tuple]:
         cur = self._connection().cursor()

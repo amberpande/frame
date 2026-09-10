@@ -48,6 +48,12 @@ export interface AgentBinding {
   grounding: string[];
 }
 
+/** Hand-written SQL. Ungoverned: no grain, no compiler, runs as the viewer. */
+export interface SqlSource {
+  sql: string;
+  note?: string;
+}
+
 export interface Block {
   id: string;
   viz: string;
@@ -55,6 +61,7 @@ export interface Block {
   title?: string;
   subtitle?: string;
   query?: QuerySpec;
+  sql?: SqlSource;
   encode?: Record<string, string>;
   sort?: SortSpec | null;
   source?: BlockSource | null;
@@ -90,6 +97,7 @@ export interface ExpressionCheck {
 }
 
 export interface DashboardSpec {
+  $schema?: string;
   id: string;
   specVersion: number;
   model: string;
@@ -150,6 +158,10 @@ export interface QueryMeta {
     rowCap: number;
   };
   params: Record<string, unknown>;
+  /** false for a scratchpad block: the number is not governed. */
+  governed?: boolean;
+  ranAs?: string | null;
+  rowCap?: number;
   sql?: string;
   bindings?: Record<string, unknown>;
 }
